@@ -1,0 +1,1883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Antarctic Meltwater 3D Dashboard · Research Platform</title>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     DEPENDENCIES
+     ══════════════════════════════════════════════════════════════════════ -->
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<style>
+/* ══════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM & GLOBAL STYLES
+   ══════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+*, *::before, *::after { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0; 
+}
+
+:root {
+  /* ── Color Palette ────────────────────────────────────────────────── */
+  --navy-deepest:   #020610;
+  --navy-deep:      #04080f;
+  --navy-medium:    #0a1628;
+  --navy-light:     #152240;
+  
+  --panel-bg:       rgba(6, 14, 28, 0.94);
+  --panel-border:   rgba(0, 200, 255, 0.12);
+  --glass-border:   rgba(74, 184, 255, 0.15);
+  
+  --teal-primary:   #00c8a8;
+  --teal-bright:    #00ffdd;
+  --ice-blue:       #4ab8ff;
+  --ocean-green:    #00e890;
+  --gold-select:    #ffd93d;
+  --red-melt:       #ff3838;
+  --deep-ice:       #1a5a9a;
+  
+  --text-bright:    #e8f4ff;
+  --text-medium:    #9db8d0;
+  --text-dim:       #5a7a98;
+  
+  /* ── Typography ───────────────────────────────────────────────────── */
+  --font-sans:      'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:      'JetBrains Mono', 'Courier New', monospace;
+  
+  /* ── Spacing & Sizing ─────────────────────────────────────────────── */
+  --sidebar-width:  280px;
+  --spacing-xs:     4px;
+  --spacing-sm:     8px;
+  --spacing-md:     12px;
+  --spacing-lg:     16px;
+  --spacing-xl:     24px;
+  
+  /* ── Effects ──────────────────────────────────────────────────────── */
+  --blur-strength:  12px;
+  --shadow-glow:    0 0 20px rgba(0, 200, 168, 0.15);
+  --shadow-panel:   0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+html, body { 
+  width: 100%; 
+  height: 100%; 
+  overflow: hidden; 
+  background: var(--navy-deepest);
+  font-family: var(--font-sans);
+  color: var(--text-bright);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#cesiumContainer { 
+  position: absolute; 
+  inset: 0; 
+  z-index: 1;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   UPLOAD MODAL OVERLAY
+   ══════════════════════════════════════════════════════════════════════ */
+
+#upload-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: linear-gradient(135deg, 
+    rgba(2, 6, 16, 0.98) 0%, 
+    rgba(4, 8, 15, 0.96) 100%
+  );
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease-in-out;
+  padding: var(--spacing-xl);
+}
+
+#upload-modal.hidden { 
+  opacity: 0; 
+  pointer-events: none; 
+}
+
+.modal-header {
+  text-align: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.modal-title {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-bright);
+  letter-spacing: 0.05em;
+  margin-bottom: var(--spacing-sm);
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--ice-blue), var(--teal-primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.modal-subtitle {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+#drop-zone {
+  width: 550px;
+  min-height: 180px;
+  border: 2px dashed var(--panel-border);
+  border-radius: 16px;
+  padding: var(--spacing-xl);
+  text-align: center;
+  cursor: pointer;
+  background: linear-gradient(135deg, 
+    rgba(0, 200, 168, 0.02) 0%, 
+    rgba(0, 200, 168, 0.05) 100%
+  );
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+}
+
+#drop-zone:hover {
+  border-color: var(--teal-primary);
+  background: linear-gradient(135deg, 
+    rgba(0, 200, 168, 0.08) 0%, 
+    rgba(0, 200, 168, 0.12) 100%
+  );
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-2px);
+}
+
+#drop-zone.drag-over {
+  border-color: var(--teal-bright);
+  background: linear-gradient(135deg, 
+    rgba(0, 255, 221, 0.12) 0%, 
+    rgba(0, 255, 221, 0.18) 100%
+  );
+  box-shadow: 0 0 30px rgba(0, 255, 221, 0.25);
+  transform: scale(1.02);
+}
+
+.drop-icon {
+  font-size: 48px;
+  opacity: 0.6;
+}
+
+.drop-text {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-bright);
+}
+
+.drop-hint {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+#file-input { 
+  display: none; 
+}
+
+#file-list {
+  width: 550px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  scrollbar-width: thin;
+  scrollbar-color: var(--teal-primary) var(--navy-medium);
+}
+
+#file-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+#file-list::-webkit-scrollbar-track {
+  background: var(--navy-medium);
+  border-radius: 3px;
+}
+
+#file-list::-webkit-scrollbar-thumb {
+  background: var(--teal-primary);
+  border-radius: 3px;
+}
+
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(0, 200, 168, 0.05);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--teal-primary);
+  transition: all 0.2s;
+}
+
+.file-item:hover {
+  background: rgba(0, 200, 168, 0.1);
+  border-color: var(--teal-primary);
+}
+
+.file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  margin-left: var(--spacing-md);
+  color: var(--text-dim);
+}
+
+#load-btn {
+  margin-top: var(--spacing-lg);
+  padding: 14px 48px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  background: linear-gradient(135deg, 
+    rgba(0, 200, 168, 0.15) 0%, 
+    rgba(0, 200, 168, 0.25) 100%
+  );
+  border: 1px solid var(--teal-primary);
+  border-radius: 10px;
+  color: var(--text-bright);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: none;
+}
+
+#load-btn:hover {
+  background: linear-gradient(135deg, 
+    rgba(0, 200, 168, 0.3) 0%, 
+    rgba(0, 200, 168, 0.4) 100%
+  );
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-2px);
+}
+
+#load-btn:active {
+  transform: translateY(0);
+}
+
+#loading-bar-wrap {
+  width: 400px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  margin-top: var(--spacing-lg);
+  overflow: hidden;
+  display: none;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+#loading-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--teal-primary), var(--teal-bright));
+  transition: width 0.1s linear;
+  box-shadow: 0 0 10px rgba(0, 200, 168, 0.5);
+}
+
+#loading-text {
+  margin-top: var(--spacing-md);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-medium);
+  display: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MAIN APPLICATION UI
+   ══════════════════════════════════════════════════════════════════════ */
+
+#app {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+  z-index: 100;
+}
+
+#app.visible {
+  opacity: 1;
+}
+
+/* ── Header ────────────────────────────────────────────────────────── */
+
+#header {
+  position: absolute;
+  top: 0;
+  left: var(--sidebar-width);
+  right: 0;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  background: linear-gradient(180deg, 
+    rgba(2, 6, 16, 0.92) 0%, 
+    transparent 100%
+  );
+  backdrop-filter: blur(var(--blur-strength));
+  pointer-events: none;
+  z-index: 10;
+}
+
+#header h1 {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-bright);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--spacing-xs);
+}
+
+#header .subtitle {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────── */
+
+#sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  height: 100%;
+  background: var(--panel-bg);
+  border-right: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--blur-strength));
+  box-shadow: var(--shadow-panel);
+  pointer-events: all;
+  overflow-y: auto;
+  padding: var(--spacing-xl) var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  z-index: 200;
+  scrollbar-width: thin;
+  scrollbar-color: var(--teal-primary) var(--navy-medium);
+}
+
+#sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+#sidebar::-webkit-scrollbar-track {
+  background: var(--navy-medium);
+}
+
+#sidebar::-webkit-scrollbar-thumb {
+  background: var(--teal-primary);
+  border-radius: 3px;
+}
+
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--spacing-xs);
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.stat-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.stat-key {
+  color: var(--text-medium);
+  font-weight: 500;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.btn-row {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.btn {
+  flex: 1;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(74, 184, 255, 0.08);
+  border: 1px solid rgba(74, 184, 255, 0.2);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ice-blue);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:hover {
+  background: rgba(74, 184, 255, 0.15);
+  border-color: var(--ice-blue);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+#add-more-btn {
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: linear-gradient(135deg, 
+    rgba(0, 200, 168, 0.12) 0%, 
+    rgba(0, 200, 168, 0.18) 100%
+  );
+  border: 1px solid var(--teal-primary);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-bright);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+}
+
+#add-more-btn:hover {
+  background: linear-gradient(135deg, 
+    rgba(0, 200, 168, 0.2) 0%, 
+    rgba(0, 200, 168, 0.3) 100%
+  );
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-2px);
+}
+
+/* ── Legend ────────────────────────────────────────────────────────── */
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 6px 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--text-medium);
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Export Panel ──────────────────────────────────────────────────── */
+
+#export-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-top: auto;
+  padding-top: var(--spacing-xl);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#export-btn {
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: linear-gradient(135deg, 
+    rgba(255, 217, 61, 0.12) 0%, 
+    rgba(255, 217, 61, 0.18) 100%
+  );
+  border: 1px solid var(--gold-select);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold-select);
+  cursor: pointer;
+  transition: all 0.25s;
+  text-align: center;
+}
+
+#export-btn:hover {
+  background: linear-gradient(135deg, 
+    rgba(255, 217, 61, 0.2) 0%, 
+    rgba(255, 217, 61, 0.3) 100%
+  );
+  box-shadow: 0 0 20px rgba(255, 217, 61, 0.2);
+  transform: translateY(-2px);
+}
+
+#export-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+#clear-all-btn {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: rgba(255, 56, 56, 0.08);
+  border: 1px solid rgba(255, 56, 56, 0.3);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 56, 56, 0.8);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+#clear-all-btn:hover {
+  background: rgba(255, 56, 56, 0.15);
+  border-color: var(--red-melt);
+  color: var(--red-melt);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   DRAWING TOOLBAR
+   ══════════════════════════════════════════════════════════════════════ */
+
+#draw-toolbar {
+  position: absolute;
+  bottom: var(--spacing-xl);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--panel-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: blur(var(--blur-strength));
+  box-shadow: var(--shadow-panel);
+  pointer-events: all;
+  z-index: 150;
+}
+
+.dtool {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dtool:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.dtool.active {
+  background: linear-gradient(135deg, 
+    rgba(0, 200, 168, 0.2) 0%, 
+    rgba(0, 200, 168, 0.3) 100%
+  );
+  border-color: var(--teal-primary);
+  box-shadow: 0 0 15px rgba(0, 200, 168, 0.3);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   LABEL ASSIGNMENT PANEL
+   ══════════════════════════════════════════════════════════════════════ */
+
+#label-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  width: 400px;
+  padding: var(--spacing-xl);
+  background: var(--panel-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  backdrop-filter: blur(var(--blur-strength));
+  box-shadow: var(--shadow-panel);
+  pointer-events: all;
+  z-index: 300;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#label-panel.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+#lp-title {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-bright);
+  text-align: center;
+  margin-bottom: var(--spacing-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#lp-count {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.lp-btn {
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: var(--spacing-sm);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.lp-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.lp-ocean {
+  background: rgba(0, 232, 144, 0.12);
+  border-color: var(--ocean-green);
+  color: var(--ocean-green);
+}
+
+.lp-ocean:hover {
+  background: rgba(0, 232, 144, 0.2);
+}
+
+.lp-ice {
+  background: rgba(74, 184, 255, 0.12);
+  border-color: var(--ice-blue);
+  color: var(--ice-blue);
+}
+
+.lp-ice:hover {
+  background: rgba(74, 184, 255, 0.2);
+}
+
+.lp-remove {
+  background: rgba(255, 56, 56, 0.12);
+  border-color: rgba(255, 56, 56, 0.4);
+  color: rgba(255, 56, 56, 0.9);
+}
+
+.lp-remove:hover {
+  background: rgba(255, 56, 56, 0.2);
+  border-color: var(--red-melt);
+  color: var(--red-melt);
+}
+
+.lp-cancel {
+  margin-top: var(--spacing-md);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   HOVER TOOLTIP
+   ══════════════════════════════════════════════════════════════════════ */
+
+#hover-tooltip {
+  position: absolute;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: rgba(6, 14, 28, 0.96);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-panel);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--text-bright);
+  pointer-events: none;
+  z-index: 400;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease-in-out;
+  max-width: 280px;
+}
+
+#hover-tooltip.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  gap: var(--spacing-md);
+}
+
+.tooltip-key {
+  color: var(--text-dim);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tooltip-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-bright);
+  text-align: right;
+}
+
+.tooltip-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 6px 0;
+}
+
+.tooltip-consensus {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.tooltip-consensus.melt {
+  background: rgba(255, 56, 56, 0.15);
+  color: var(--red-melt);
+}
+
+.tooltip-consensus.ice {
+  background: rgba(26, 90, 154, 0.15);
+  color: var(--ice-blue);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   UTILITY CLASSES
+   ══════════════════════════════════════════════════════════════════════ */
+
+.hidden {
+  display: none !important;
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   RESPONSIVE DESIGN
+   ══════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 240px;
+  }
+  
+  #label-panel {
+    width: 90%;
+  }
+  
+  #drop-zone,
+  #file-list {
+    width: 90%;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     CESIUM CONTAINER
+     ══════════════════════════════════════════════════════════════════════ -->
+<div id="cesiumContainer"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     UPLOAD MODAL
+     ══════════════════════════════════════════════════════════════════════ -->
+<div id="upload-modal">
+  <div class="modal-header">
+    <div class="modal-title">Antarctic Meltwater Dashboard</div>
+    <div class="modal-subtitle">Upload Phase 1 metadata or Phase 4 prediction CSVs</div>
+  </div>
+  
+  <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <div class="drop-icon">📂</div>
+    <div class="drop-text">Click to browse or drag & drop CSV files</div>
+    <div class="drop-hint">Supports multiple batch files</div>
+  </div>
+  
+  <input type="file" id="file-input" accept=".csv" multiple>
+  
+  <div id="file-list"></div>
+  
+  <button id="load-btn" onclick="loadFiles()">LOAD DATA</button>
+  
+  <div id="loading-bar-wrap">
+    <div id="loading-bar"></div>
+  </div>
+  <div id="loading-text">Initializing...</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     MAIN APPLICATION UI
+     ══════════════════════════════════════════════════════════════════════ -->
+<div id="app">
+  <!-- Header -->
+  <div id="header">
+    <h1>Antarctica Meltwater Research Dashboard</h1>
+    <span class="subtitle">Dual-Mode Platform: Manual Data Labelling & ML Prediction Visualization</span>
+  </div>
+  
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <!-- Add More CSVs Button -->
+    <button id="add-more-btn" onclick="openUploadModal()">📁 Add More CSVs</button>
+    
+    <!-- Dataset Stats -->
+    <div class="sidebar-section">
+      <div class="section-label">Dataset Statistics</div>
+      <div class="stat-row">
+        <span class="stat-key">Total Traces Loaded</span>
+        <span class="stat-value" id="s-total">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Files Loaded</span>
+        <span class="stat-value" id="s-files">0</span>
+      </div>
+    </div>
+    
+    <!-- Phase 4 Predictions -->
+    <div class="sidebar-section">
+      <div class="section-label">Phase 4 · ML Predictions</div>
+      <div class="stat-row">
+        <span class="stat-key" style="color: var(--red-melt);">🔴 Predicted Meltwater</span>
+        <span class="stat-value" id="s-pred-melt">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key" style="color: var(--deep-ice);">🔵 Predicted Ice</span>
+        <span class="stat-value" id="s-pred-ice">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key" style="color: var(--gold-select);">⚡ Melt Percentage</span>
+        <span class="stat-value" id="s-pred-pct">0.00%</span>
+      </div>
+    </div>
+    
+    <!-- Phase 1 Manual Labels -->
+    <div class="sidebar-section">
+      <div class="section-label">Phase 1 · Manual Labels</div>
+      <div class="stat-row">
+        <span class="stat-key" style="color: var(--ocean-green);">🌊 Ocean (Label = 1)</span>
+        <span class="stat-value" id="s-ocean">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key" style="color: var(--ice-blue);">🧊 Interior (Label = 0)</span>
+        <span class="stat-value" id="s-ice">0</span>
+      </div>
+    </div>
+    
+    <!-- Camera Controls -->
+    <div class="sidebar-section">
+      <div class="section-label">Camera Shortcuts</div>
+      <div class="btn-row">
+        <div class="btn" onclick="flyToAntarctica()">🌐 Antarctica</div>
+        <div class="btn" onclick="flyToData()">📍 Data Extent</div>
+      </div>
+    </div>
+    
+    <!-- Legend -->
+    <div class="sidebar-section">
+      <div class="section-label">Color Legend</div>
+      <div class="legend-row">
+        <div class="legend-dot" style="background: var(--red-melt);"></div>
+        <span>ML Predicted Meltwater (Phase 4)</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-dot" style="background: var(--deep-ice); opacity: 0.8;"></div>
+        <span>ML Predicted Ice (Phase 4)</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-dot" style="background: var(--ocean-green);"></div>
+        <span>Manual Label: Ocean (Phase 1)</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-dot" style="background: var(--ice-blue);"></div>
+        <span>Manual Label: Interior (Phase 1)</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-dot" style="background: var(--gold-select);"></div>
+        <span>Selected (In Polygon)</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-dot" style="background: #8ab4f8; opacity: 0.6;"></div>
+        <span>Unlabelled Raw Metadata</span>
+      </div>
+    </div>
+    
+    <!-- Export Controls -->
+    <div id="export-wrap">
+      <div id="export-btn" class="disabled" onclick="exportSelection()">
+        No Labels to Export
+      </div>
+      <div id="clear-all-btn" onclick="clearAllLabels()">✕ Clear Phase 1 Labels</div>
+    </div>
+  </div>
+  
+  <!-- Drawing Toolbar -->
+  <div id="draw-toolbar">
+    <div class="dtool" id="dtool-draw" onclick="toggleDraw()" title="Draw Polygon">✏️</div>
+    <div class="dtool" onclick="undoVertex()" title="Undo Vertex">↩️</div>
+    <div class="dtool" onclick="clearDrawing()" title="Clear Polygon">🗑️</div>
+  </div>
+  
+  <!-- Label Assignment Panel -->
+  <div id="label-panel">
+    <div id="lp-title">Assign Label to Selection</div>
+    <div id="lp-count">0 traces selected</div>
+    <div class="btn-row" style="flex-direction: column;">
+      <div class="lp-btn lp-ocean" onclick="assignLabel(1)">🌊 Ocean (Label = 1)</div>
+      <div class="lp-btn lp-ice" onclick="assignLabel(0)">🧊 Interior (Label = 0)</div>
+      <div class="lp-btn lp-remove" onclick="assignLabel(undefined)">🧹 Remove Label</div>
+      <div class="lp-btn lp-cancel" onclick="cancelSelection()">✕ Cancel</div>
+    </div>
+  </div>
+</div>
+
+<!-- Hover Tooltip -->
+<div id="hover-tooltip"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     JAVASCRIPT APPLICATION
+     ══════════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════════
+   1. CESIUM INITIALIZATION
+   ═══════════════════════════════════════════════════════════════════════ */
+
+// Replace with your Cesium Ion access token
+Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiYjg2ZjQ0ZC02YWNhLTQyNGYtYjAyYS01YzY1MzgxNTk0OTEiLCJpZCI6NDAxMjI5LCJpYXQiOjE3NzMxMzMyMzF9.5Hwu9ciIqd3qfmaYCdTykSNO3Osnq-k1x0gVhOoZ2iI";
+
+const viewer = new Cesium.Viewer("cesiumContainer", {
+  animation: false,
+  timeline: false,
+  baseLayerPicker: false,
+  geocoder: false,
+  homeButton: false,
+  sceneModePicker: false,
+  navigationHelpButton: false,
+  fullscreenButton: false,
+  infoBox: false,
+  selectionIndicator: false,
+  terrain: Cesium.Terrain.fromWorldTerrain(),
+  skyBox: new Cesium.SkyBox({
+    sources: {
+      positiveX: 'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_px.jpg',
+      negativeX: 'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mx.jpg',
+      positiveY: 'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_py.jpg',
+      negativeY: 'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_my.jpg',
+      positiveZ: 'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_pz.jpg',
+      negativeZ: 'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg'
+    }
+  })
+});
+
+const scene = viewer.scene;
+const camera = viewer.camera;
+scene.globe.enableLighting = false;
+scene.globe.baseColor = Cesium.Color.fromCssColorString('#04080f');
+
+/* ═══════════════════════════════════════════════════════════════════════
+   2. GLOBAL STATE MANAGEMENT
+   ═══════════════════════════════════════════════════════════════════════ */
+
+// ── Data Storage ────────────────────────────────────────────────────────
+let allPoints = [];              // Master array of all trace points
+let pointCollection = null;      // Cesium PointPrimitiveCollection for rendering
+let loadedFiles = new Set();     // Track which files have been loaded
+let currentPhase = null;         // 'phase1' or 'phase4' - auto-detected
+
+// ── Drawing State ───────────────────────────────────────────────────────
+let drawMode = false;            // Is polygon drawing active?
+let vertices = [];               // Current polygon vertices (Cartesian3)
+let vertexEntities = [];         // Visual markers for vertices
+let polylineEnt = null;          // Entity for polygon outline
+let polygonEnt = null;           // Entity for filled polygon
+
+// ── Selection State ─────────────────────────────────────────────────────
+let selectedIndices = [];        // Indices of points inside current polygon
+
+// ── Color Definitions ───────────────────────────────────────────────────
+const COLORS = {
+  PHASE1_UNLABELED: Cesium.Color.fromCssColorString('#8ab4f8').withAlpha(0.6),
+  OCEAN_LABEL:      Cesium.Color.fromCssColorString('#00e890').withAlpha(1.0),
+  ICE_LABEL:        Cesium.Color.fromCssColorString('#4ab8ff').withAlpha(1.0),
+  SELECTED:         Cesium.Color.fromCssColorString('#ffd93d').withAlpha(1.0),
+  PRED_MELTWATER:   Cesium.Color.fromCssColorString('#ff3838').withAlpha(1.0),
+  PRED_ICE:         Cesium.Color.fromCssColorString('#1a5a9a').withAlpha(0.7),
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   3. COLOR & SIZE LOGIC
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Determine the color of a point based on its state and data.
+ * Priority: Selection > Manual Label > ML Prediction > Default
+ */
+function getPointColor(point, index) {
+  if (selectedIndices.includes(index)) return COLORS.SELECTED;
+  if (point.label === 1) return COLORS.OCEAN_LABEL;
+  if (point.label === 0) return COLORS.ICE_LABEL;
+  if (point.consensus === 1) return COLORS.PRED_MELTWATER;
+  if (point.consensus === 0) return COLORS.PRED_ICE;
+  return COLORS.PHASE1_UNLABELED;
+}
+
+/**
+ * Determine the size of a point based on its state.
+ */
+function getPointSize(point, index) {
+  if (selectedIndices.includes(index)) return 6;
+  if (point.label !== undefined) return 5;
+  if (point.consensus === 1) return 5; // Meltwater pops more
+  if (point.consensus === 0) return 4;
+  return 3;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   4. FILE UPLOAD & MODAL MANAGEMENT
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const fileInput = document.getElementById('file-input');
+const dropZone = document.getElementById('drop-zone');
+let pendingFiles = [];
+
+// ── Drag & Drop Event Handlers ──────────────────────────────────────────
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('drag-over');
+});
+
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  addFiles([...e.dataTransfer.files]);
+});
+
+fileInput.addEventListener('change', e => {
+  addFiles([...e.target.files]);
+});
+
+/**
+ * Add files to the pending upload queue and update the UI.
+ */
+function addFiles(files) {
+  const csvFiles = files.filter(f => f.name.toLowerCase().endsWith('.csv'));
+  if (!csvFiles.length) {
+    alert('Please upload CSV files only.');
+    return;
+  }
+  
+  // Add new files (avoid duplicates)
+  csvFiles.forEach(f => {
+    if (!pendingFiles.some(p => p.name === f.name)) {
+      pendingFiles.push(f);
+    }
+  });
+  
+  // Update file list UI
+  const fileListEl = document.getElementById('file-list');
+  fileListEl.innerHTML = '';
+  pendingFiles.forEach(f => {
+    const sizeText = (f.size / 1e6).toFixed(2) + ' MB';
+    fileListEl.innerHTML += `
+      <div class="file-item">
+        <span class="file-name">📄 ${f.name}</span>
+        <span class="file-size">${sizeText}</span>
+      </div>
+    `;
+  });
+  
+  document.getElementById('load-btn').style.display = 'block';
+}
+
+/**
+ * Open the upload modal (for "Add More CSVs" button).
+ */
+function openUploadModal() {
+  pendingFiles = [];
+  fileInput.value = '';
+  document.getElementById('upload-modal').classList.remove('hidden');
+  document.getElementById('file-list').innerHTML = '';
+  document.getElementById('load-btn').style.display = 'none';
+  document.getElementById('loading-bar-wrap').style.display = 'none';
+  document.getElementById('loading-text').style.display = 'none';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   5. CSV PARSING WITH PAPAPARSE
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Detect whether a CSV is Phase 1 or Phase 4 based on headers.
+ * Phase 1: filename, segment, trace_idx, latitude, longitude
+ * Phase 4: Same + consensus_meltwater, melt_prob, etc.
+ */
+function detectPhase(headers) {
+  const h = headers.map(x => x.toLowerCase());
+  const hasConsensus = h.includes('consensus_meltwater');
+  const hasMeltProb = h.includes('melt_prob');
+  
+  if (hasConsensus || hasMeltProb) {
+    return 'phase4';
+  }
+  return 'phase1';
+}
+
+/**
+ * Parse a single CSV file using PapaParse.
+ * Returns a promise that resolves to an array of point objects.
+ */
+function parseCSVFile(file) {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: true,
+      complete: function(results) {
+        if (!results.data || results.data.length === 0) {
+          reject(new Error('CSV file is empty or invalid'));
+          return;
+        }
+        
+        // Detect phase from headers
+        const headers = results.meta.fields;
+        const phase = detectPhase(headers);
+        
+        // Map rows to point objects
+        const points = results.data.map(row => {
+          const pt = {
+            lat: row.latitude || row.Latitude,
+            lon: row.longitude || row.Longitude,
+            filename: row.filename || 'unknown',
+            segment: row.segment || 'unknown',
+            trace_idx: row.trace_idx !== undefined ? row.trace_idx : null,
+          };
+          
+          // Phase 4 specific fields
+          if (phase === 'phase4') {
+            pt.consensus = row.consensus_meltwater;
+            pt.melt_prob = row.melt_prob;
+            pt.peak_power_db = row.peak_power_db;
+            pt.echo_width_fwhm = row.echo_width_fwhm;
+            pt.rsr_specularity = row.rsr_specularity;
+            // Add other physics features as needed
+          }
+          
+          return pt;
+        }).filter(pt => {
+          // Filter out invalid coordinates
+          return pt.lat !== null && pt.lat !== undefined && 
+                 pt.lon !== null && pt.lon !== undefined &&
+                 !isNaN(pt.lat) && !isNaN(pt.lon);
+        });
+        
+        resolve({ points, phase });
+      },
+      error: function(error) {
+        reject(error);
+      }
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   6. CHUNKED POINT LOADING (PERFORMANCE OPTIMIZATION)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Add points to the Cesium scene in chunks to prevent browser freeze.
+ * Uses requestAnimationFrame for smooth rendering.
+ */
+function addPointsInChunks(points, chunkSize = 5000) {
+  return new Promise((resolve) => {
+    let index = 0;
+    
+    function processChunk() {
+      const end = Math.min(index + chunkSize, points.length);
+      
+      for (let i = index; i < end; i++) {
+        const pt = points[i];
+        
+        // Add to master array
+        const globalIndex = allPoints.length;
+        allPoints.push(pt);
+        
+        // Add to Cesium point collection
+        pointCollection.add({
+          position: Cesium.Cartesian3.fromDegrees(pt.lon, pt.lat),
+          color: getPointColor(pt, globalIndex),
+          pixelSize: getPointSize(pt, globalIndex),
+        });
+      }
+      
+      index = end;
+      
+      // Update progress
+      const progress = (index / points.length) * 100;
+      updateLoadingProgress(progress);
+      
+      // Continue or finish
+      if (index < points.length) {
+        requestAnimationFrame(processChunk);
+      } else {
+        resolve();
+      }
+    }
+    
+    processChunk();
+  });
+}
+
+/**
+ * Update the loading progress bar.
+ */
+function updateLoadingProgress(percent) {
+  const bar = document.getElementById('loading-bar');
+  const text = document.getElementById('loading-text');
+  bar.style.width = percent + '%';
+  text.textContent = `Loading points: ${Math.round(percent)}%`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   7. MAIN FILE LOADING FUNCTION
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Load all pending CSV files, parse them, and add points to the scene.
+ */
+async function loadFiles() {
+  if (pendingFiles.length === 0) return;
+  
+  // Show loading UI
+  document.getElementById('load-btn').style.display = 'none';
+  document.getElementById('loading-bar-wrap').style.display = 'block';
+  document.getElementById('loading-text').style.display = 'block';
+  
+  try {
+    // Initialize point collection if needed
+    if (!pointCollection) {
+      pointCollection = scene.primitives.add(new Cesium.PointPrimitiveCollection());
+    }
+    
+    // Parse all files
+    for (let i = 0; i < pendingFiles.length; i++) {
+      const file = pendingFiles[i];
+      
+      // Skip if already loaded
+      if (loadedFiles.has(file.name)) continue;
+      
+      updateLoadingProgress((i / pendingFiles.length) * 50); // First 50% for parsing
+      document.getElementById('loading-text').textContent = `Parsing ${file.name}...`;
+      
+      const { points, phase } = await parseCSVFile(file);
+      
+      // Set current phase (first file determines the mode)
+      if (!currentPhase) {
+        currentPhase = phase;
+        console.log(`Detected Phase: ${phase}`);
+      }
+      
+      // Add points in chunks
+      document.getElementById('loading-text').textContent = `Adding ${points.length.toLocaleString()} points from ${file.name}...`;
+      await addPointsInChunks(points, 5000);
+      
+      loadedFiles.add(file.name);
+    }
+    
+    // Update stats
+    updateStats();
+    
+    // Fly to data extent
+    flyToData();
+    
+    // Hide modal, show app
+    document.getElementById('upload-modal').classList.add('hidden');
+    document.getElementById('app').classList.add('visible');
+    
+    // Clear pending files
+    pendingFiles = [];
+    
+  } catch (error) {
+    console.error('Error loading files:', error);
+    alert('Error loading CSV files. Check console for details.');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   8. STATISTICS UPDATES
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Update all sidebar statistics.
+ */
+function updateStats() {
+  // Total traces
+  document.getElementById('s-total').textContent = allPoints.length.toLocaleString();
+  
+  // Files loaded
+  document.getElementById('s-files').textContent = loadedFiles.size;
+  
+  // Phase 4 predictions
+  const predMelt = allPoints.filter(p => p.consensus === 1).length;
+  const predIce = allPoints.filter(p => p.consensus === 0).length;
+  const totalPred = predMelt + predIce;
+  const meltPct = totalPred > 0 ? (predMelt / totalPred * 100).toFixed(2) : '0.00';
+  
+  document.getElementById('s-pred-melt').textContent = predMelt.toLocaleString();
+  document.getElementById('s-pred-ice').textContent = predIce.toLocaleString();
+  document.getElementById('s-pred-pct').textContent = meltPct + '%';
+  
+  // Phase 1 manual labels
+  const oceanLabels = allPoints.filter(p => p.label === 1).length;
+  const iceLabels = allPoints.filter(p => p.label === 0).length;
+  
+  document.getElementById('s-ocean').textContent = oceanLabels.toLocaleString();
+  document.getElementById('s-ice').textContent = iceLabels.toLocaleString();
+  
+  // Update export button
+  const totalLabels = oceanLabels + iceLabels;
+  const exportBtn = document.getElementById('export-btn');
+  if (totalLabels > 0) {
+    exportBtn.textContent = `📥 Export ${totalLabels.toLocaleString()} Labels`;
+    exportBtn.classList.remove('disabled');
+  } else {
+    exportBtn.textContent = 'No Labels to Export';
+    exportBtn.classList.add('disabled');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   9. CAMERA CONTROLS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Fly camera to Antarctica.
+ */
+function flyToAntarctica() {
+  camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(0, -90, 15000000),
+    duration: 2.0
+  });
+}
+
+/**
+ * Fly camera to the extent of loaded data.
+ */
+function flyToData() {
+  if (allPoints.length === 0) return;
+  
+  // Calculate bounding box
+  let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+  allPoints.forEach(pt => {
+    if (pt.lat < minLat) minLat = pt.lat;
+    if (pt.lat > maxLat) maxLat = pt.lat;
+    if (pt.lon < minLon) minLon = pt.lon;
+    if (pt.lon > maxLon) maxLon = pt.lon;
+  });
+  
+  // Fly to center
+  const centerLat = (minLat + maxLat) / 2;
+  const centerLon = (minLon + maxLon) / 2;
+  const range = Math.max(maxLat - minLat, maxLon - minLon) * 111000 * 1.5; // Convert to meters
+  
+  camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, range),
+    duration: 2.0
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   10. POLYGON DRAWING SYSTEM
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
+
+/**
+ * Toggle polygon drawing mode.
+ */
+function toggleDraw() {
+  drawMode = !drawMode;
+  const btn = document.getElementById('dtool-draw');
+  
+  if (drawMode) {
+    btn.classList.add('active');
+    scene.canvas.style.cursor = 'crosshair';
+  } else {
+    btn.classList.remove('active');
+    scene.canvas.style.cursor = 'default';
+  }
+}
+
+/**
+ * Handle mouse clicks for polygon drawing.
+ */
+handler.setInputAction(function(click) {
+  if (!drawMode) return;
+  
+  // Get clicked position on globe
+  const cartesian = viewer.camera.pickEllipsoid(click.position, scene.globe.ellipsoid);
+  if (!cartesian) return;
+  
+  vertices.push(cartesian);
+  
+  // Add vertex marker
+  const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+  const entity = viewer.entities.add({
+    position: cartesian,
+    point: {
+      pixelSize: 8,
+      color: Cesium.Color.fromCssColorString('#ffd93d'),
+      outlineColor: Cesium.Color.WHITE,
+      outlineWidth: 2
+    }
+  });
+  vertexEntities.push(entity);
+  
+  // Update polyline
+  updatePolyline();
+  
+}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+/**
+ * Handle right-click to close polygon.
+ */
+handler.setInputAction(function(click) {
+  if (!drawMode || vertices.length < 3) return;
+  
+  closePolygon();
+  
+}, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+
+/**
+ * Update the polyline visualization during drawing.
+ */
+function updatePolyline() {
+  if (polylineEnt) {
+    viewer.entities.remove(polylineEnt);
+  }
+  
+  if (vertices.length < 2) return;
+  
+  polylineEnt = viewer.entities.add({
+    polyline: {
+      positions: vertices,
+      width: 3,
+      material: Cesium.Color.fromCssColorString('#ffd93d').withAlpha(0.8)
+    }
+  });
+}
+
+/**
+ * Close the polygon and select points inside.
+ */
+function closePolygon() {
+  if (vertices.length < 3) return;
+  
+  // Remove polyline, add filled polygon
+  if (polylineEnt) {
+    viewer.entities.remove(polylineEnt);
+    polylineEnt = null;
+  }
+  
+  polygonEnt = viewer.entities.add({
+    polygon: {
+      hierarchy: new Cesium.PolygonHierarchy(vertices),
+      material: Cesium.Color.fromCssColorString('#ffd93d').withAlpha(0.2),
+      outline: true,
+      outlineColor: Cesium.Color.fromCssColorString('#ffd93d'),
+      outlineWidth: 2
+    }
+  });
+  
+  // Convert vertices to lat/lon for Turf.js
+  const polygonCoords = vertices.map(v => {
+    const carto = Cesium.Cartographic.fromCartesian(v);
+    return [Cesium.Math.toDegrees(carto.longitude), Cesium.Math.toDegrees(carto.latitude)];
+  });
+  polygonCoords.push(polygonCoords[0]); // Close the loop
+  
+  const turfPolygon = turf.polygon([polygonCoords]);
+  
+  // Use Turf.js to find points inside polygon
+  selectedIndices = [];
+  allPoints.forEach((pt, idx) => {
+    const turfPoint = turf.point([pt.lon, pt.lat]);
+    if (turf.booleanPointInPolygon(turfPoint, turfPolygon)) {
+      selectedIndices.push(idx);
+    }
+  });
+  
+  // Update point colors
+  refreshPointColors();
+  
+  // Show label panel
+  document.getElementById('lp-count').textContent = `${selectedIndices.length.toLocaleString()} traces selected`;
+  document.getElementById('label-panel').classList.add('visible');
+  
+  // Exit draw mode
+  drawMode = false;
+  document.getElementById('dtool-draw').classList.remove('active');
+  scene.canvas.style.cursor = 'default';
+}
+
+/**
+ * Undo the last vertex.
+ */
+function undoVertex() {
+  if (vertices.length === 0) return;
+  
+  vertices.pop();
+  const entity = vertexEntities.pop();
+  if (entity) viewer.entities.remove(entity);
+  
+  updatePolyline();
+}
+
+/**
+ * Clear the current drawing.
+ */
+function clearDrawing() {
+  vertices = [];
+  vertexEntities.forEach(e => viewer.entities.remove(e));
+  vertexEntities = [];
+  
+  if (polylineEnt) {
+    viewer.entities.remove(polylineEnt);
+    polylineEnt = null;
+  }
+  
+  if (polygonEnt) {
+    viewer.entities.remove(polygonEnt);
+    polygonEnt = null;
+  }
+  
+  selectedIndices = [];
+  refreshPointColors();
+  
+  document.getElementById('label-panel').classList.remove('visible');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   11. LABEL ASSIGNMENT
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Assign a label to all selected points.
+ * @param {number|undefined} labelValue - 0 for Interior, 1 for Ocean, undefined to remove
+ */
+function assignLabel(labelValue) {
+  selectedIndices.forEach(idx => {
+    allPoints[idx].label = labelValue;
+  });
+  
+  // Clear selection
+  clearDrawing();
+  
+  // Update stats
+  updateStats();
+}
+
+/**
+ * Cancel the current selection without assigning labels.
+ */
+function cancelSelection() {
+  clearDrawing();
+}
+
+/**
+ * Clear all Phase 1 manual labels.
+ */
+function clearAllLabels() {
+  if (!confirm('Are you sure you want to clear all Phase 1 labels?')) return;
+  
+  allPoints.forEach(pt => {
+    delete pt.label;
+  });
+  
+  refreshPointColors();
+  updateStats();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   12. POINT RENDERING
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Refresh all point colors and sizes.
+ */
+function refreshPointColors() {
+  if (!pointCollection) return;
+  
+  for (let i = 0; i < allPoints.length; i++) {
+    const primitive = pointCollection.get(i);
+    if (primitive) {
+      primitive.color = getPointColor(allPoints[i], i);
+      primitive.pixelSize = getPointSize(allPoints[i], i);
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   13. HOVER TOOLTIPS (PHASE 4)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const tooltip = document.getElementById('hover-tooltip');
+let hoveredPointIndex = null;
+
+/**
+ * Handle mouse move for hover tooltips.
+ */
+handler.setInputAction(function(movement) {
+  // Only show tooltips in Phase 4 mode
+  if (currentPhase !== 'phase4') return;
+  
+  // Pick a point
+  const pickedObject = scene.pick(movement.endPosition);
+  
+  if (Cesium.defined(pickedObject) && pickedObject.primitive === pointCollection) {
+    const pointIndex = pickedObject.id;
+    
+    if (pointIndex !== undefined && pointIndex !== hoveredPointIndex) {
+      hoveredPointIndex = pointIndex;
+      const point = allPoints[pointIndex];
+      
+      if (point) {
+        showTooltip(point, movement.endPosition);
+      }
+    }
+  } else {
+    hideTooltip();
+    hoveredPointIndex = null;
+  }
+}, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+/**
+ * Display the hover tooltip.
+ */
+function showTooltip(point, screenPosition) {
+  const meltProb = point.melt_prob !== undefined ? (point.melt_prob * 100).toFixed(1) + '%' : 'N/A';
+  const consensus = point.consensus === 1 ? 'Meltwater' : point.consensus === 0 ? 'Ice' : 'Unknown';
+  const consensusClass = point.consensus === 1 ? 'melt' : 'ice';
+  
+  let html = `
+    <div class="tooltip-row">
+      <span class="tooltip-key">File:</span>
+      <span class="tooltip-value">${point.filename}</span>
+    </div>
+    <div class="tooltip-row">
+      <span class="tooltip-key">Trace Index:</span>
+      <span class="tooltip-value">${point.trace_idx}</span>
+    </div>
+    <div class="tooltip-divider"></div>
+    <div class="tooltip-row">
+      <span class="tooltip-key">Latitude:</span>
+      <span class="tooltip-value">${point.lat.toFixed(6)}°</span>
+    </div>
+    <div class="tooltip-row">
+      <span class="tooltip-key">Longitude:</span>
+      <span class="tooltip-value">${point.lon.toFixed(6)}°</span>
+    </div>
+    <div class="tooltip-divider"></div>
+    <div class="tooltip-row">
+      <span class="tooltip-key">Melt Probability:</span>
+      <span class="tooltip-value">${meltProb}</span>
+    </div>
+  `;
+  
+  // Add physics features if available
+  if (point.peak_power_db !== undefined) {
+    html += `
+      <div class="tooltip-row">
+        <span class="tooltip-key">Peak Power:</span>
+        <span class="tooltip-value">${point.peak_power_db.toFixed(1)} dB</span>
+      </div>
+    `;
+  }
+  
+  if (point.echo_width_fwhm !== undefined) {
+    html += `
+      <div class="tooltip-row">
+        <span class="tooltip-key">Echo Width:</span>
+        <span class="tooltip-value">${point.echo_width_fwhm.toFixed(3)} ns</span>
+      </div>
+    `;
+  }
+  
+  if (point.rsr_specularity !== undefined) {
+    html += `
+      <div class="tooltip-row">
+        <span class="tooltip-key">RSR Specularity:</span>
+        <span class="tooltip-value">${point.rsr_specularity.toFixed(3)}</span>
+      </div>
+    `;
+  }
+  
+  html += `
+    <div class="tooltip-consensus ${consensusClass}">
+      ${consensus === 'Meltwater' ? '🔴' : '🔵'} ${consensus}
+    </div>
+  `;
+  
+  tooltip.innerHTML = html;
+  tooltip.style.left = (screenPosition.x + 15) + 'px';
+  tooltip.style.top = (screenPosition.y + 15) + 'px';
+  tooltip.classList.add('visible');
+}
+
+/**
+ * Hide the hover tooltip.
+ */
+function hideTooltip() {
+  tooltip.classList.remove('visible');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   14. EXPORT SELECTION.JSON
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Export Phase 1 labels as selection.json.
+ */
+function exportSelection() {
+  const labeledPoints = allPoints.filter(p => p.label !== undefined);
+  
+  if (labeledPoints.length === 0) {
+    alert('No labels to export. Please assign labels first.');
+    return;
+  }
+  
+  // Count labels
+  const oceanCount = labeledPoints.filter(p => p.label === 1).length;
+  const iceCount = labeledPoints.filter(p => p.label === 0).length;
+  
+  // Build JSON structure
+  const exportData = {
+    metadata: {
+      exported_at: new Date().toISOString(),
+      total_labelled: labeledPoints.length,
+      ocean_count: oceanCount,
+      ice_count: iceCount,
+      description: "Phase 1 Metadata Labels mapped for Kaggle Targeted Extraction."
+    },
+    labels: labeledPoints.map(p => ({
+      label: p.label,
+      filename: p.filename,
+      trace_idx: p.trace_idx
+    }))
+  };
+  
+  // Create download
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'selection.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  console.log('Exported selection.json:', exportData);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   15. INITIALIZATION
+   ═══════════════════════════════════════════════════════════════════════ */
+
+// Start with upload modal visible
+document.getElementById('upload-modal').classList.remove('hidden');
+
+console.log('Antarctic Meltwater 3D Dashboard initialized.');
+console.log('Ready to load Phase 1 metadata or Phase 4 prediction CSVs.');
+
+</script>
+
+</body>
+</html>
