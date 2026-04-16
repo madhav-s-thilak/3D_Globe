@@ -944,6 +944,8 @@ function setThreshold(pct) {
 function applyThreshold() {
   if (!pointCollection || currentPhase !== 'phase4') return;
   let visMelt = 0, totIce = 0;
+  
+  // 1. Count visible points based on slider
   for (let i = 0; i < allPoints.length; i++) {
     const pt   = allPoints[i];
     const prim = pointCollection.get(i);
@@ -958,9 +960,20 @@ function applyThreshold() {
       prim.show = true;
     }
   }
+
+  // 2. Calculate the dynamic Percentage
+  const totalTraces = allPoints.length;
+  const meltFraction = totalTraces > 0 ? (visMelt / totalTraces * 100).toFixed(2) + '%' : '0.00%';
+
+  // 3. Update the UI Elements
   setEl('s-vis-melt', visMelt.toLocaleString());
   setEl('s-vis-ice',  totIce.toLocaleString());
   setEl('h-visible',  visMelt.toLocaleString());
+  
+  // NEW: Update these two dynamically
+  setEl('s-pred-pct', meltFraction);
+  setEl('h-pct',      meltFraction);
+
   scene.requestRender();
   drawHistogram();
 }
@@ -1254,9 +1267,7 @@ function updateStats() {
   const pT = pM+pI;
   setEl('s-pred-melt', pM.toLocaleString());
   setEl('s-pred-ice',  pI.toLocaleString());
-  setEl('s-pred-pct', pT>0 ? (pM/pT*100).toFixed(2)+'%' : '0.00%');
   setEl('h-melt', pM.toLocaleString());
-  setEl('h-pct',  pT>0 ? (pM/pT*100).toFixed(2)+'%' : '—');
 
   const oL = allPoints.filter(p=>p.label===1).length;
   const iL = allPoints.filter(p=>p.label===0).length;
