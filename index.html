@@ -3,1881 +3,1704 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Antarctic Meltwater 3D Dashboard · Research Platform</title>
+<title>MeltWatch · Antarctic Meltwater Research</title>
 
-<!-- ══════════════════════════════════════════════════════════════════════
-     DEPENDENCIES
-     ══════════════════════════════════════════════════════════════════════ -->
 <script src="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Cesium.js"></script>
-<link href="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<link  href="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
 <style>
-/* ══════════════════════════════════════════════════════════════════════
-   DESIGN SYSTEM & GLOBAL STYLES
-   ══════════════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
-*, *::before, *::after { 
-  box-sizing: border-box; 
-  margin: 0; 
-  padding: 0; 
-}
+/* ═══════════════════════════════════════════════════════════ TOKENS */
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 
 :root {
-  /* ── Color Palette ────────────────────────────────────────────────── */
-  --navy-deepest:   #020610;
-  --navy-deep:      #04080f;
-  --navy-medium:    #0a1628;
-  --navy-light:     #152240;
-  
-  --panel-bg:       rgba(6, 14, 28, 0.94);
-  --panel-border:   rgba(0, 200, 255, 0.12);
-  --glass-border:   rgba(74, 184, 255, 0.15);
-  
-  --teal-primary:   #00c8a8;
-  --teal-bright:    #00ffdd;
-  --ice-blue:       #4ab8ff;
-  --ocean-green:    #00e890;
-  --gold-select:    #ffd93d;
-  --red-melt:       #ff3838;
-  --deep-ice:       #1a5a9a;
-  
-  --text-bright:    #e8f4ff;
-  --text-medium:    #9db8d0;
-  --text-dim:       #5a7a98;
-  
-  /* ── Typography ───────────────────────────────────────────────────── */
-  --font-sans:      'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono:      'JetBrains Mono', 'Courier New', monospace;
-  
-  /* ── Spacing & Sizing ─────────────────────────────────────────────── */
-  --sidebar-width:  280px;
-  --spacing-xs:     4px;
-  --spacing-sm:     8px;
-  --spacing-md:     12px;
-  --spacing-lg:     16px;
-  --spacing-xl:     24px;
-  
-  /* ── Effects ──────────────────────────────────────────────────────── */
-  --blur-strength:  12px;
-  --shadow-glow:    0 0 20px rgba(0, 200, 168, 0.15);
-  --shadow-panel:   0 4px 24px rgba(0, 0, 0, 0.5);
+  --bg:    #000;
+  --s0:    #070707;
+  --s1:    #0d0d0d;
+  --s2:    #151515;
+  --s3:    #1e1e1e;
+  --s4:    #272727;
+
+  --glass:     rgba(8,8,8,0.86);
+  --border:    rgba(255,255,255,0.09);
+  --border-md: rgba(255,255,255,0.16);
+  --border-hi: rgba(255,255,255,0.26);
+
+  /* ── TEXT — all brighter ── */
+  --tx1: #ffffff;          /* primary — pure white */
+  --tx2: #c8c8c8;          /* secondary — light grey */
+  --tx3: #787878;          /* tertiary — mid grey */
+  --tx4: #424242;          /* placeholder */
+
+  /* ── ACCENT ── */
+  --red:       #e53e3e;
+  --red-a10:   rgba(229,62,62,.10);
+  --red-a35:   rgba(229,62,62,.35);
+  --amber:     #e8a020;
+  --ice:       #5090b8;
+  --ice-a15:   rgba(80,144,184,.15);
+  --green:     #3dba76;
+  --gold:      #d4900f;
+
+  --sans: 'Inter', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+
+  --sb:  278px;
+  --hdr: 46px;
+  --ease: cubic-bezier(.4,0,.2,1);
 }
 
-html, body { 
-  width: 100%; 
-  height: 100%; 
-  overflow: hidden; 
-  background: var(--navy-deepest);
-  font-family: var(--font-sans);
-  color: var(--text-bright);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+html,body {
+  width:100%; height:100%; overflow:hidden;
+  background:var(--bg); color:var(--tx1);
+  font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;
 }
 
-#cesiumContainer { 
-  position: absolute; 
-  inset: 0; 
-  z-index: 1;
-}
+#cesiumContainer { position:absolute; inset:0; z-index:1; }
+.cesium-widget-credits, .cesium-viewer-bottom { display:none !important; }
 
-/* ══════════════════════════════════════════════════════════════════════
-   UPLOAD MODAL OVERLAY
-   ══════════════════════════════════════════════════════════════════════ */
-
+/* ═══════════════════════════════════════════════════════════ UPLOAD MODAL */
 #upload-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: linear-gradient(135deg, 
-    rgba(2, 6, 16, 0.98) 0%, 
-    rgba(4, 8, 15, 0.96) 100%
-  );
-  backdrop-filter: blur(8px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.3s ease-in-out;
-  padding: var(--spacing-xl);
+  position:fixed; inset:0; z-index:1000;
+  background:var(--bg);
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:16px; padding:40px 24px;
+  transition:opacity .35s var(--ease), visibility .35s;
+}
+#upload-modal.hidden { opacity:0; visibility:hidden; pointer-events:none; }
+
+#upload-modal::before {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.014) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.014) 1px,transparent 1px);
+  background-size:52px 52px;
 }
 
-#upload-modal.hidden { 
-  opacity: 0; 
-  pointer-events: none; 
+.m-badge {
+  font-family:var(--mono); font-size:9px; color:var(--tx3);
+  letter-spacing:.22em; text-transform:uppercase;
+  border:1px solid var(--border); border-radius:20px; padding:4px 12px;
 }
-
-.modal-header {
-  text-align: center;
-  margin-bottom: var(--spacing-xl);
+.m-title {
+  font-size:26px; font-weight:700; letter-spacing:-.03em;
+  color:var(--tx1); text-align:center;
 }
-
-.modal-title {
-  font-family: var(--font-mono);
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-bright);
-  letter-spacing: 0.05em;
-  margin-bottom: var(--spacing-sm);
-  text-transform: uppercase;
-  background: linear-gradient(90deg, var(--ice-blue), var(--teal-primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.modal-subtitle {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--text-dim);
-  font-weight: 400;
+.m-sub {
+  font-size:12px; color:var(--tx2); text-align:center;
+  max-width:400px; line-height:1.7;
 }
 
 #drop-zone {
-  width: 550px;
-  min-height: 180px;
-  border: 2px dashed var(--panel-border);
-  border-radius: 16px;
-  padding: var(--spacing-xl);
-  text-align: center;
-  cursor: pointer;
-  background: linear-gradient(135deg, 
-    rgba(0, 200, 168, 0.02) 0%, 
-    rgba(0, 200, 168, 0.05) 100%
-  );
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-md);
+  width:min(520px,90vw); min-height:120px;
+  border:1px dashed rgba(255,255,255,.12); border-radius:12px;
+  padding:28px 24px; cursor:pointer; background:var(--s1);
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:8px;
+  transition:all .2s; position:relative;
 }
+#drop-zone:hover, #drop-zone.drag-over {
+  border-color:rgba(255,255,255,.28); background:var(--s2); transform:translateY(-2px);
+}
+#drop-zone.drag-over { border-color:var(--red); border-style:solid; }
+.dz-icon  { font-size:22px; opacity:.4; }
+.dz-label { font-size:13px; font-weight:600; color:var(--tx1); }
+.dz-hint  { font-family:var(--mono); font-size:10px; color:var(--tx3); }
 
-#drop-zone:hover {
-  border-color: var(--teal-primary);
-  background: linear-gradient(135deg, 
-    rgba(0, 200, 168, 0.08) 0%, 
-    rgba(0, 200, 168, 0.12) 100%
-  );
-  box-shadow: var(--shadow-glow);
-  transform: translateY(-2px);
-}
-
-#drop-zone.drag-over {
-  border-color: var(--teal-bright);
-  background: linear-gradient(135deg, 
-    rgba(0, 255, 221, 0.12) 0%, 
-    rgba(0, 255, 221, 0.18) 100%
-  );
-  box-shadow: 0 0 30px rgba(0, 255, 221, 0.25);
-  transform: scale(1.02);
-}
-
-.drop-icon {
-  font-size: 48px;
-  opacity: 0.6;
-}
-
-.drop-text {
-  font-family: var(--font-sans);
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text-bright);
-}
-
-.drop-hint {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-#file-input { 
-  display: none; 
-}
+#file-input { display:none; }
 
 #file-list {
-  width: 550px;
-  max-height: 240px;
-  overflow-y: auto;
-  margin-top: var(--spacing-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  scrollbar-width: thin;
-  scrollbar-color: var(--teal-primary) var(--navy-medium);
+  width:min(520px,90vw); max-height:160px; overflow-y:auto;
+  display:flex; flex-direction:column; gap:3px;
+  scrollbar-width:thin; scrollbar-color:var(--s4) transparent;
 }
-
-#file-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-#file-list::-webkit-scrollbar-track {
-  background: var(--navy-medium);
-  border-radius: 3px;
-}
-
-#file-list::-webkit-scrollbar-thumb {
-  background: var(--teal-primary);
-  border-radius: 3px;
-}
-
 .file-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: rgba(0, 200, 168, 0.05);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--teal-primary);
-  transition: all 0.2s;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:6px 11px; background:var(--s1);
+  border:1px solid var(--border); border-radius:6px;
+  font-family:var(--mono); font-size:10.5px;
 }
-
-.file-item:hover {
-  background: rgba(0, 200, 168, 0.1);
-  border-color: var(--teal-primary);
+.file-name { color:var(--tx2); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.file-size { color:var(--tx3); margin-left:10px; flex-shrink:0; }
+.file-x    {
+  width:16px; height:16px; border-radius:3px; margin-left:8px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; color:var(--tx3); font-size:11px; transition:all .12s;
 }
-
-.file-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-size {
-  margin-left: var(--spacing-md);
-  color: var(--text-dim);
-}
+.file-x:hover { background:var(--red-a10); color:var(--red); }
 
 #load-btn {
-  margin-top: var(--spacing-lg);
-  padding: 14px 48px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 600;
-  background: linear-gradient(135deg, 
-    rgba(0, 200, 168, 0.15) 0%, 
-    rgba(0, 200, 168, 0.25) 100%
-  );
-  border: 1px solid var(--teal-primary);
-  border-radius: 10px;
-  color: var(--text-bright);
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  display: none;
+  display:none; padding:11px 44px; border-radius:8px;
+  font-family:var(--sans); font-size:13px; font-weight:600;
+  background:var(--s2); border:1px solid var(--border-md);
+  color:var(--tx1); cursor:pointer; transition:all .15s;
 }
+#load-btn:hover { background:var(--s3); border-color:var(--border-hi); transform:translateY(-1px); }
 
-#load-btn:hover {
-  background: linear-gradient(135deg, 
-    rgba(0, 200, 168, 0.3) 0%, 
-    rgba(0, 200, 168, 0.4) 100%
-  );
-  box-shadow: var(--shadow-glow);
-  transform: translateY(-2px);
+/* loading progress */
+#loading-wrap {
+  display:none; width:min(420px,80vw);
+  flex-direction:column; align-items:center; gap:6px;
 }
-
-#load-btn:active {
-  transform: translateY(0);
+#loading-bar-outer {
+  width:100%; height:2px; background:var(--s2); border-radius:1px; overflow:hidden;
 }
+#loading-bar  { height:100%; width:0; background:var(--tx1); transition:width .08s linear; }
+#loading-text { font-family:var(--mono); font-size:10px; color:var(--tx2); }
+#loading-sub  { font-family:var(--mono); font-size:9px;  color:var(--tx3); }
 
-#loading-bar-wrap {
-  width: 400px;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
-  margin-top: var(--spacing-lg);
-  overflow: hidden;
-  display: none;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-#loading-bar {
-  height: 100%;
-  width: 0;
-  background: linear-gradient(90deg, var(--teal-primary), var(--teal-bright));
-  transition: width 0.1s linear;
-  box-shadow: 0 0 10px rgba(0, 200, 168, 0.5);
-}
-
-#loading-text {
-  margin-top: var(--spacing-md);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-medium);
-  display: none;
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   MAIN APPLICATION UI
-   ══════════════════════════════════════════════════════════════════════ */
-
+/* ═══════════════════════════════════════════════════════════ APP SHELL */
 #app {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.5s ease-in-out;
-  z-index: 100;
+  position:absolute; inset:0; z-index:100;
+  pointer-events:none; opacity:0;
+  transition:opacity .5s var(--ease);
 }
+#app.visible { opacity:1; }
 
-#app.visible {
-  opacity: 1;
-}
-
-/* ── Header ────────────────────────────────────────────────────────── */
-
+/* ═══════════════════════════════════════════════════════════ HEADER */
 #header {
-  position: absolute;
-  top: 0;
-  left: var(--sidebar-width);
-  right: 0;
-  padding: var(--spacing-lg) var(--spacing-xl);
-  background: linear-gradient(180deg, 
-    rgba(2, 6, 16, 0.92) 0%, 
-    transparent 100%
-  );
-  backdrop-filter: blur(var(--blur-strength));
-  pointer-events: none;
-  z-index: 10;
+  position:absolute; top:0; left:var(--sb); right:0;
+  height:var(--hdr);
+  background:rgba(0,0,0,.72);
+  backdrop-filter:blur(24px) saturate(1.4);
+  -webkit-backdrop-filter:blur(24px) saturate(1.4);
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 18px; z-index:10; pointer-events:all;
+}
+.hdr-l { display:flex; align-items:center; gap:12px; }
+.hdr-r { display:flex; align-items:center; gap:20px; }
+
+.live-dot {
+  width:6px; height:6px; border-radius:50%;
+  background:var(--red); flex-shrink:0;
+  animation:blink 2.5s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+.hdr-title { font-size:12px; font-weight:700; color:var(--tx1); letter-spacing:-.01em; }
+.hdr-pipe  { width:1px; height:13px; background:var(--border); }
+.hdr-sub   { font-family:var(--mono); font-size:9.5px; color:var(--tx3); }
+
+.hstat            { display:flex; flex-direction:column; align-items:flex-end; gap:0; }
+.hstat-lbl        { font-size:8.5px; color:var(--tx3); text-transform:uppercase; letter-spacing:.1em; }
+.hstat-val        { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--tx1); }
+.hstat-val.c-red  { color:var(--red); }
+.hstat-val.c-gold { color:var(--gold); }
+
+/* shortcut hint */
+#hint-btn {
+  font-family:var(--mono); font-size:9px; color:var(--tx3);
+  display:flex; align-items:center; gap:4px; cursor:pointer;
+  pointer-events:all; padding:4px 6px; border-radius:5px; transition:all .12s;
+}
+#hint-btn:hover { color:var(--tx1); background:var(--s2); }
+kbd {
+  display:inline-block; padding:1px 5px;
+  background:var(--s2); border:1px solid var(--border);
+  border-radius:3px; font-family:var(--mono); font-size:8px; color:var(--tx2);
 }
 
-#header h1 {
-  font-family: var(--font-mono);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-bright);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: var(--spacing-xs);
-}
-
-#header .subtitle {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--text-dim);
-}
-
-/* ── Sidebar ───────────────────────────────────────────────────────── */
-
+/* ═══════════════════════════════════════════════════════════ SIDEBAR */
 #sidebar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: var(--sidebar-width);
-  height: 100%;
-  background: var(--panel-bg);
-  border-right: 1px solid var(--glass-border);
-  backdrop-filter: blur(var(--blur-strength));
-  box-shadow: var(--shadow-panel);
-  pointer-events: all;
-  overflow-y: auto;
-  padding: var(--spacing-xl) var(--spacing-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xl);
-  z-index: 200;
-  scrollbar-width: thin;
-  scrollbar-color: var(--teal-primary) var(--navy-medium);
+  position:absolute; top:0; left:0;
+  width:var(--sb); height:100%;
+  background:var(--glass);
+  backdrop-filter:blur(28px) saturate(1.3);
+  -webkit-backdrop-filter:blur(28px) saturate(1.3);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  z-index:200; pointer-events:all;
+  transition:transform .3s var(--ease);
 }
+#sidebar.collapsed { transform:translateX(calc(-1 * var(--sb) + 14px)); }
 
-#sidebar::-webkit-scrollbar {
-  width: 6px;
+/* collapse tab */
+#sb-toggle {
+  position:absolute; top:50%; right:-26px;
+  transform:translateY(-50%);
+  width:22px; height:44px;
+  background:var(--glass); border:1px solid var(--border); border-left:none;
+  border-radius:0 6px 6px 0;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; color:var(--tx2); font-size:11px;
+  transition:all .15s; pointer-events:all;
 }
+#sb-toggle:hover { background:var(--s2); color:var(--tx1); }
+.tog-icon { transition:transform .3s var(--ease); }
+#sidebar.collapsed .tog-icon { transform:rotate(180deg); }
 
-#sidebar::-webkit-scrollbar-track {
-  background: var(--navy-medium);
+.sb-scroll {
+  flex:1; overflow-y:auto; overflow-x:hidden;
+  padding:0 12px 8px;
+  display:flex; flex-direction:column;
+  scrollbar-width:thin; scrollbar-color:var(--s4) transparent;
 }
+.sb-scroll::-webkit-scrollbar { width:3px; }
+.sb-scroll::-webkit-scrollbar-thumb { background:var(--s4); border-radius:2px; }
 
-#sidebar::-webkit-scrollbar-thumb {
-  background: var(--teal-primary);
-  border-radius: 3px;
+/* brand */
+.sb-brand { padding:13px 2px 12px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.sb-brand-row { display:flex; align-items:center; gap:8px; }
+.sb-mark {
+  width:22px; height:22px; border-radius:5px; background:var(--red);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:11px; font-weight:700; color:#fff; flex-shrink:0;
 }
+.sb-name { font-size:12px; font-weight:700; color:var(--tx1); }
+.sb-ver  { font-family:var(--mono); font-size:8.5px; color:var(--tx3); margin-top:2px; }
 
-.sidebar-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
+/* section */
+.sec { padding:13px 2px 6px; }
+.sec-lbl {
+  font-size:8.5px; font-weight:600; color:var(--tx3);
+  text-transform:uppercase; letter-spacing:.16em;
+  padding-bottom:7px; border-bottom:1px solid var(--border); display:block;
 }
+.sec-lbl.red  { color:rgba(229,62,62,.7);  border-bottom-color:rgba(229,62,62,.18); }
+.sec-lbl.blue { color:rgba(80,144,184,.7); border-bottom-color:rgba(80,144,184,.18); }
 
-.section-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin-bottom: var(--spacing-xs);
-}
-
+/* stat rows */
 .stat-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  transition: all 0.2s;
+  display:flex; justify-content:space-between; align-items:center;
+  padding:5px 7px; border-radius:5px; transition:background .1s;
+}
+.stat-row:hover { background:var(--s1); }
+.stat-k  { font-size:11px; color:var(--tx2); display:flex; align-items:center; gap:6px; }
+.s-pip   { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.stat-v  { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--tx1); }
+
+/* ── PHASE 4 SLIDER ── */
+#p4-panel { display:none; }
+#p4-panel.active { display:flex; flex-direction:column; }
+
+.slider-card {
+  background:var(--s1); border:1px solid var(--border);
+  border-radius:9px; padding:12px 12px 10px; margin-bottom:6px;
+}
+.slider-top {
+  display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;
+}
+.slider-lbl { font-size:11px; font-weight:600; color:var(--tx2); line-height:1.45; }
+.slider-num {
+  font-family:var(--mono); font-size:22px; font-weight:700;
+  color:var(--red); line-height:1; flex-shrink:0; margin-left:8px; transition:color .2s;
 }
 
-.stat-row:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.08);
+#threshold-slider {
+  -webkit-appearance:none; appearance:none;
+  width:100%; height:3px; border-radius:2px;
+  outline:none; cursor:pointer; display:block; margin:0 0 8px;
+}
+#threshold-slider::-webkit-slider-runnable-track { height:3px; border-radius:2px; }
+#threshold-slider::-webkit-slider-thumb {
+  -webkit-appearance:none;
+  width:15px; height:15px; border-radius:50%;
+  background:#fff; border:2.5px solid var(--red);
+  margin-top:-6px; cursor:pointer;
+  transition:transform .15s, box-shadow .15s;
+  box-shadow:0 1px 4px rgba(0,0,0,.5);
+}
+#threshold-slider::-webkit-slider-thumb:hover {
+  transform:scale(1.2); box-shadow:0 0 0 5px var(--red-a10);
+}
+#threshold-slider::-moz-range-track { height:3px; border-radius:2px; background:var(--s3); }
+#threshold-slider::-moz-range-progress { height:3px; border-radius:2px; background:var(--red); }
+#threshold-slider::-moz-range-thumb {
+  width:15px; height:15px; border-radius:50%;
+  background:#fff; border:2.5px solid var(--red); cursor:pointer;
 }
 
-.stat-key {
-  color: var(--text-medium);
-  font-weight: 500;
+.tick-row {
+  display:flex; justify-content:space-between;
+  font-family:var(--mono); font-size:8.5px; color:var(--tx3); margin-bottom:8px;
 }
 
-.stat-value {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  color: var(--text-bright);
+.presets { display:flex; gap:3px; }
+.pst {
+  flex:1; padding:5px 0; text-align:center; cursor:pointer;
+  font-family:var(--mono); font-size:8.5px; font-weight:600;
+  background:var(--s2); border:1px solid var(--border);
+  border-radius:4px; color:var(--tx3); transition:all .12s;
+}
+.pst:hover  { background:var(--red-a10); border-color:var(--red-a35); color:var(--red); }
+.pst.active { background:var(--red-a10); border-color:var(--red-a35); color:var(--red); }
+
+.vis-row { display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-top:8px; }
+.vis-cell { background:var(--s2); border:1px solid var(--border); border-radius:6px; padding:7px 8px; }
+.vc-lbl { font-size:8.5px; color:var(--tx3); text-transform:uppercase; letter-spacing:.09em; margin-bottom:3px; }
+.vc-val { font-family:var(--mono); font-size:15px; font-weight:700; color:var(--tx1); }
+.vc-val.red  { color:var(--red); }
+.vc-val.blue { color:var(--ice); }
+
+/* ── HISTOGRAM ── */
+#hist-wrap {
+  background:var(--s1); border:1px solid var(--border);
+  border-radius:8px; padding:10px 10px 6px; margin-bottom:6px;
+}
+.hist-title { font-size:8.5px; color:var(--tx3); text-transform:uppercase; letter-spacing:.12em; margin-bottom:7px; }
+#hist-canvas { width:100%; height:44px; display:block; border-radius:3px; }
+.hist-axis {
+  display:flex; justify-content:space-between;
+  font-family:var(--mono); font-size:7.5px; color:var(--tx4); margin-top:3px;
 }
 
-.btn-row {
-  display: flex;
-  gap: var(--spacing-sm);
+/* ── COORDINATE SEARCH ── */
+.coord-row { display:flex; gap:4px; margin-top:0; }
+.coord-input {
+  flex:1; padding:7px 9px; border-radius:6px;
+  background:var(--s1); border:1px solid var(--border);
+  color:var(--tx1); font-family:var(--mono); font-size:10px;
+  outline:none; transition:border-color .15s; min-width:0;
+}
+.coord-input::placeholder { color:var(--tx4); }
+.coord-input:focus { border-color:var(--border-md); }
+.coord-go {
+  padding:7px 10px; border-radius:6px; cursor:pointer;
+  background:var(--s2); border:1px solid var(--border);
+  color:var(--tx2); font-size:12px; transition:all .12s; flex-shrink:0;
+}
+.coord-go:hover { background:var(--s3); color:var(--tx1); border-color:var(--border-md); }
+
+/* ── COLOUR RAMP LEGEND ── */
+.ramp-bar {
+  height:8px; width:100%; border-radius:4px;
+  background:linear-gradient(90deg,var(--ice) 0%,var(--amber) 50%,var(--red) 100%);
+  margin-bottom:3px;
+}
+.ramp-labels {
+  display:flex; justify-content:space-between;
+  font-family:var(--mono); font-size:8px; color:var(--tx3);
 }
 
-.btn {
-  flex: 1;
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: rgba(74, 184, 255, 0.08);
-  border: 1px solid rgba(74, 184, 255, 0.2);
-  border-radius: 6px;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--ice-blue);
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s;
+.leg-row { display:flex; align-items:center; gap:8px; padding:3.5px 0; }
+.leg-pip { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.leg-txt { font-size:11px; color:var(--tx2); }
+
+/* ── GENERIC BUTTONS ── */
+.sb-btn {
+  width:100%; padding:8px 11px; border-radius:6px;
+  font-size:11px; font-weight:500;
+  background:var(--s1); border:1px solid var(--border);
+  color:var(--tx2); text-align:center; cursor:pointer; transition:all .12s;
+}
+.sb-btn:hover { background:var(--s2); border-color:var(--border-md); color:var(--tx1); }
+.sb-btn-pair  { display:flex; gap:5px; }
+.sb-btn-pair .sb-btn { flex:1; }
+
+.sb-btn-gold {
+  background:rgba(212,144,15,.06); border-color:rgba(212,144,15,.22); color:var(--gold);
+}
+.sb-btn-gold:hover { background:rgba(212,144,15,.14); border-color:rgba(212,144,15,.48); }
+.sb-btn-gold.disabled { opacity:.3; pointer-events:none; }
+
+.sb-btn-danger {
+  background:transparent; border-color:rgba(229,62,62,.14); color:rgba(229,62,62,.55); font-size:10px;
+}
+.sb-btn-danger:hover { background:var(--red-a10); border-color:var(--red-a35); color:var(--red); }
+
+/* sidebar footer */
+.sb-footer {
+  padding:10px 12px; border-top:1px solid var(--border);
+  display:flex; flex-direction:column; gap:5px; flex-shrink:0;
 }
 
-.btn:hover {
-  background: rgba(74, 184, 255, 0.15);
-  border-color: var(--ice-blue);
-  transform: translateY(-1px);
-}
-
-.btn:active {
-  transform: translateY(0);
-}
-
-#add-more-btn {
-  width: 100%;
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: linear-gradient(135deg, 
-    rgba(0, 200, 168, 0.12) 0%, 
-    rgba(0, 200, 168, 0.18) 100%
-  );
-  border: 1px solid var(--teal-primary);
-  border-radius: 8px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-bright);
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  text-align: center;
-}
-
-#add-more-btn:hover {
-  background: linear-gradient(135deg, 
-    rgba(0, 200, 168, 0.2) 0%, 
-    rgba(0, 200, 168, 0.3) 100%
-  );
-  box-shadow: var(--shadow-glow);
-  transform: translateY(-2px);
-}
-
-/* ── Legend ────────────────────────────────────────────────────────── */
-
-.legend-row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: 6px 0;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  color: var(--text-medium);
-}
-
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-/* ── Export Panel ──────────────────────────────────────────────────── */
-
-#export-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  margin-top: auto;
-  padding-top: var(--spacing-xl);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-#export-btn {
-  width: 100%;
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: linear-gradient(135deg, 
-    rgba(255, 217, 61, 0.12) 0%, 
-    rgba(255, 217, 61, 0.18) 100%
-  );
-  border: 1px solid var(--gold-select);
-  border-radius: 8px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--gold-select);
-  cursor: pointer;
-  transition: all 0.25s;
-  text-align: center;
-}
-
-#export-btn:hover {
-  background: linear-gradient(135deg, 
-    rgba(255, 217, 61, 0.2) 0%, 
-    rgba(255, 217, 61, 0.3) 100%
-  );
-  box-shadow: 0 0 20px rgba(255, 217, 61, 0.2);
-  transform: translateY(-2px);
-}
-
-#export-btn.disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-#clear-all-btn {
-  width: 100%;
-  padding: var(--spacing-sm) var(--spacing-lg);
-  background: rgba(255, 56, 56, 0.08);
-  border: 1px solid rgba(255, 56, 56, 0.3);
-  border-radius: 6px;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 500;
-  color: rgba(255, 56, 56, 0.8);
-  cursor: pointer;
-  transition: all 0.2s;
-  text-align: center;
-}
-
-#clear-all-btn:hover {
-  background: rgba(255, 56, 56, 0.15);
-  border-color: var(--red-melt);
-  color: var(--red-melt);
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   DRAWING TOOLBAR
-   ══════════════════════════════════════════════════════════════════════ */
-
+/* ═══════════════════════════════════════════════════════════ DRAWING TOOLBAR */
 #draw-toolbar {
-  position: absolute;
-  bottom: var(--spacing-xl);
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  background: var(--panel-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  backdrop-filter: blur(var(--blur-strength));
-  box-shadow: var(--shadow-panel);
-  pointer-events: all;
-  z-index: 150;
+  position:absolute; bottom:22px; left:50%; transform:translateX(-50%);
+  display:flex; gap:4px; padding:6px 10px;
+  background:var(--glass); border:1px solid var(--border); border-radius:10px;
+  backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+  z-index:150; pointer-events:all;
+  box-shadow:0 4px 20px rgba(0,0,0,.5);
 }
-
 .dtool {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  font-size: 20px;
-  cursor: pointer;
-  transition: all 0.2s;
+  width:36px; height:36px;
+  display:flex; align-items:center; justify-content:center;
+  background:transparent; border:1px solid var(--border);
+  border-radius:6px; font-size:15px; cursor:pointer; transition:all .12s;
+  position:relative;
 }
+.dtool:hover  { background:var(--s2); border-color:var(--border-md); }
+.dtool.active { background:var(--red-a10); border-color:var(--red-a35); }
 
-.dtool:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
+/* tooltip on toolbar buttons */
+.dtip {
+  position:absolute; bottom:calc(100% + 7px); left:50%;
+  transform:translateX(-50%);
+  white-space:nowrap; font-size:9px; font-family:var(--sans);
+  background:var(--s3); border:1px solid var(--border);
+  border-radius:4px; padding:3px 8px; color:var(--tx2);
+  pointer-events:none; opacity:0; transition:opacity .1s;
 }
+.dtool:hover .dtip { opacity:1; }
+.tb-sep { width:1px; height:22px; background:var(--border); align-self:center; margin:0 2px; }
+#vtx-badge { font-family:var(--mono); font-size:9px; color:var(--tx3); padding:0 6px; white-space:nowrap; display:flex; align-items:center; }
 
-.dtool.active {
-  background: linear-gradient(135deg, 
-    rgba(0, 200, 168, 0.2) 0%, 
-    rgba(0, 200, 168, 0.3) 100%
-  );
-  border-color: var(--teal-primary);
-  box-shadow: 0 0 15px rgba(0, 200, 168, 0.3);
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   LABEL ASSIGNMENT PANEL
-   ══════════════════════════════════════════════════════════════════════ */
-
+/* ═══════════════════════════════════════════════════════════ LABEL PANEL */
 #label-panel {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(0.9);
-  width: 400px;
-  padding: var(--spacing-xl);
-  background: var(--panel-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  backdrop-filter: blur(var(--blur-strength));
-  box-shadow: var(--shadow-panel);
-  pointer-events: all;
-  z-index: 300;
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%) scale(.92);
+  width:min(330px,90vw); padding:20px;
+  background:rgba(4,4,4,.98);
+  border:1px solid var(--border-md); border-radius:12px;
+  backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+  z-index:300; pointer-events:all;
+  opacity:0; visibility:hidden; transition:all .22s var(--ease);
+  box-shadow:0 8px 40px rgba(0,0,0,.8);
 }
-
-#label-panel.visible {
-  opacity: 1;
-  visibility: visible;
-  transform: translate(-50%, -50%) scale(1);
-}
-
-#lp-title {
-  font-family: var(--font-mono);
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-bright);
-  text-align: center;
-  margin-bottom: var(--spacing-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-#lp-count {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--text-dim);
-  text-align: center;
-  margin-bottom: var(--spacing-xl);
-}
-
+#label-panel.visible { opacity:1; visibility:visible; transform:translate(-50%,-50%) scale(1); }
+#lp-title { font-size:13px; font-weight:700; text-align:center; color:var(--tx1); margin-bottom:3px; }
+#lp-count { font-family:var(--mono); font-size:11px; color:var(--tx2); text-align:center; margin-bottom:16px; }
+.lp-btns  { display:flex; flex-direction:column; gap:5px; }
 .lp-btn {
-  width: 100%;
-  padding: var(--spacing-md) var(--spacing-lg);
-  margin-bottom: var(--spacing-sm);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-bright);
-  cursor: pointer;
-  transition: all 0.2s;
-  text-align: center;
+  width:100%; padding:10px 14px; border-radius:7px;
+  font-size:11.5px; font-weight:500; text-align:center; cursor:pointer;
+  border:1px solid var(--border); background:var(--s1); color:var(--tx2);
+  transition:all .12s;
 }
+.lp-btn:hover { background:var(--s2); color:var(--tx1); border-color:var(--border-md); }
+.lp-ocean  { border-color:rgba(61,186,118,.25); color:var(--green); background:rgba(61,186,118,.05); }
+.lp-ocean:hover  { background:rgba(61,186,118,.12); border-color:rgba(61,186,118,.5); }
+.lp-ice    { border-color:rgba(80,144,184,.25); color:var(--ice); background:var(--ice-a15); }
+.lp-ice:hover    { background:rgba(80,144,184,.18); border-color:rgba(80,144,184,.5); }
+.lp-remove { border-color:rgba(229,62,62,.18); color:rgba(229,62,62,.65); background:transparent; }
+.lp-remove:hover { background:var(--red-a10); border-color:var(--red-a35); color:var(--red); }
+.lp-cancel { margin-top:3px; }
 
-.lp-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
-}
-
-.lp-ocean {
-  background: rgba(0, 232, 144, 0.12);
-  border-color: var(--ocean-green);
-  color: var(--ocean-green);
-}
-
-.lp-ocean:hover {
-  background: rgba(0, 232, 144, 0.2);
-}
-
-.lp-ice {
-  background: rgba(74, 184, 255, 0.12);
-  border-color: var(--ice-blue);
-  color: var(--ice-blue);
-}
-
-.lp-ice:hover {
-  background: rgba(74, 184, 255, 0.2);
-}
-
-.lp-remove {
-  background: rgba(255, 56, 56, 0.12);
-  border-color: rgba(255, 56, 56, 0.4);
-  color: rgba(255, 56, 56, 0.9);
-}
-
-.lp-remove:hover {
-  background: rgba(255, 56, 56, 0.2);
-  border-color: var(--red-melt);
-  color: var(--red-melt);
-}
-
-.lp-cancel {
-  margin-top: var(--spacing-md);
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   HOVER TOOLTIP
-   ══════════════════════════════════════════════════════════════════════ */
-
+/* ═══════════════════════════════════════════════════════════ TOOLTIP */
 #hover-tooltip {
-  position: absolute;
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: rgba(6, 14, 28, 0.96);
-  border: 1px solid var(--glass-border);
-  border-radius: 10px;
-  backdrop-filter: blur(16px);
-  box-shadow: var(--shadow-panel);
-  font-family: var(--font-sans);
-  font-size: 11px;
-  color: var(--text-bright);
-  pointer-events: none;
-  z-index: 400;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.15s ease-in-out;
-  max-width: 280px;
+  position:fixed; z-index:600; width:294px;
+  background:rgba(4,4,4,.97);
+  border:1px solid rgba(255,255,255,.11);
+  border-radius:10px; overflow:hidden;
+  pointer-events:none; opacity:0; visibility:hidden;
+  transition:opacity .1s var(--ease), visibility .1s;
+  box-shadow:0 4px 8px rgba(0,0,0,.5), 0 16px 48px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.04);
 }
-
-#hover-tooltip.visible {
-  opacity: 1;
-  visibility: visible;
+#hover-tooltip.visible { opacity:1; visibility:visible; }
+.tt-bar  { height:3px; }
+.tt-body { padding:11px 13px 13px; }
+.tt-file { font-family:var(--mono); font-size:10px; color:var(--tx2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:1px; }
+.tt-meta { font-family:var(--mono); font-size:8.5px; color:var(--tx3); margin-bottom:9px; }
+.tt-prob-block {
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--s1); border:1px solid var(--border); border-radius:6px;
+  padding:7px 10px; margin-bottom:10px;
 }
-
-.tooltip-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 3px 0;
-  gap: var(--spacing-md);
+.tt-prob-lbl  { font-size:9.5px; color:var(--tx2); }
+.tt-prob-val  { font-family:var(--mono); font-size:20px; font-weight:700; line-height:1; }
+.tt-prob-val.red   { color:var(--red);   }
+.tt-prob-val.amber { color:var(--amber); }
+.tt-prob-val.blue  { color:var(--ice);   }
+.tt-div {
+  font-size:8px; font-weight:600; color:var(--tx3);
+  text-transform:uppercase; letter-spacing:.14em;
+  border-top:1px solid rgba(255,255,255,.05);
+  padding-top:7px; margin:7px 0 6px;
 }
+.tt-loc { display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:2px; }
+.tt-loc-cell  { display:flex; flex-direction:column; gap:1px; }
+.tt-loc-lbl   { font-size:7.5px; color:var(--tx3); text-transform:uppercase; letter-spacing:.09em; }
+.tt-loc-val   { font-family:var(--mono); font-size:11px; font-weight:600; color:var(--tx1); }
+.tt-feats     { display:grid; grid-template-columns:auto 1fr auto; column-gap:6px; row-gap:0; }
+.tt-fk        { font-family:var(--mono); font-size:9px; color:var(--tx2); padding:2px 0; white-space:nowrap; }
+.tt-fv        { font-family:var(--mono); font-size:9px; font-weight:600; color:var(--tx1); text-align:right; padding:2px 0; }
+.tt-fv.ice    { color:var(--ice); }
+.tt-fbar-wrap { display:flex; align-items:center; padding:2px 0; }
+.tt-fbar      { height:2px; border-radius:1px; background:rgba(255,255,255,.08); width:28px; overflow:hidden; }
+.tt-fbar-fill { height:100%; border-radius:1px; }
 
-.tooltip-key {
-  color: var(--text-dim);
-  font-weight: 500;
-  white-space: nowrap;
+/* ═══════════════════════════════════════════════════════════ TOAST */
+#toast {
+  position:fixed; bottom:76px; left:50%;
+  transform:translateX(-50%) translateY(12px);
+  background:var(--s3); border:1px solid var(--border-md);
+  border-radius:8px; padding:8px 16px;
+  font-size:11px; color:var(--tx1); font-weight:500;
+  opacity:0; pointer-events:none;
+  transition:opacity .22s, transform .22s;
+  z-index:700; white-space:nowrap;
+  box-shadow:0 4px 16px rgba(0,0,0,.6);
 }
+#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
-.tooltip-value {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  color: var(--text-bright);
-  text-align: right;
+/* ═══════════════════════════════════════════════════════════ KEYBOARD OVERLAY */
+#keys-overlay {
+  position:fixed; inset:0; z-index:900;
+  background:rgba(0,0,0,.82); backdrop-filter:blur(8px);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; visibility:hidden; transition:all .2s;
 }
-
-.tooltip-divider {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.1);
-  margin: 6px 0;
+#keys-overlay.visible { opacity:1; visibility:visible; }
+.keys-card {
+  background:var(--s1); border:1px solid var(--border-md);
+  border-radius:14px; padding:24px 28px; width:min(480px,90vw);
+  box-shadow:0 20px 60px rgba(0,0,0,.8);
 }
+.keys-title { font-size:14px; font-weight:700; color:var(--tx1); margin-bottom:16px; letter-spacing:-.01em; }
+.keys-grid  { display:grid; grid-template-columns:1fr 1fr; gap:7px 20px; }
+.key-row    { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.key-desc   { font-size:11px; color:var(--tx2); }
+.keys-close { margin-top:18px; text-align:center; font-size:10px; color:var(--tx3); cursor:pointer; }
+.keys-close:hover { color:var(--tx2); }
 
-.tooltip-consensus {
-  margin-top: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-  text-align: center;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.tooltip-consensus.melt {
-  background: rgba(255, 56, 56, 0.15);
-  color: var(--red-melt);
-}
-
-.tooltip-consensus.ice {
-  background: rgba(26, 90, 154, 0.15);
-  color: var(--ice-blue);
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   UTILITY CLASSES
-   ══════════════════════════════════════════════════════════════════════ */
-
-.hidden {
-  display: none !important;
-}
-
-.fade-in {
-  animation: fadeIn 0.5s ease-in-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   RESPONSIVE DESIGN
-   ══════════════════════════════════════════════════════════════════════ */
-
-@media (max-width: 768px) {
-  :root {
-    --sidebar-width: 240px;
-  }
-  
-  #label-panel {
-    width: 90%;
-  }
-  
-  #drop-zone,
-  #file-list {
-    width: 90%;
-  }
-}
+/* ═══════════════════════════════════════════════════════════ UTILITIES */
+.hidden { display:none !important; }
+::-webkit-scrollbar { width:3px; height:3px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--s4); border-radius:2px; }
 </style>
 </head>
-
 <body>
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     CESIUM CONTAINER
-     ══════════════════════════════════════════════════════════════════════ -->
 <div id="cesiumContainer"></div>
 
-<!-- ══════════════════════════════════════════════════════════════════════
-     UPLOAD MODAL
-     ══════════════════════════════════════════════════════════════════════ -->
+<!-- ══════════ UPLOAD MODAL ══════════ -->
 <div id="upload-modal">
-  <div class="modal-header">
-    <div class="modal-title">Antarctic Meltwater Dashboard</div>
-    <div class="modal-subtitle">Upload Phase 1 metadata or Phase 4 prediction CSVs</div>
+  <div class="m-badge">NASA CReSIS MCoRDS · Dual-GMM · Antarctic Research</div>
+  <div class="m-title">MeltWatch</div>
+  <div class="m-sub">
+    Upload <strong>Phase 1</strong> metadata CSVs (lat/lon only) for manual labelling,
+    or <strong>Phase 4</strong> <code style="font-family:var(--mono);font-size:10px">predictions_batch_XXX.csv</code>
+    files to visualise ML predictions. Also accepts
+    <code style="font-family:var(--mono);font-size:10px">reference_locations.csv</code>
+    to display known subglacial lake sites.
   </div>
-  
   <div id="drop-zone" onclick="document.getElementById('file-input').click()">
-    <div class="drop-icon">📂</div>
-    <div class="drop-text">Click to browse or drag & drop CSV files</div>
-    <div class="drop-hint">Supports multiple batch files</div>
+    <div class="dz-icon">⬆</div>
+    <div class="dz-label">Click to browse or drag &amp; drop CSV files</div>
+    <div class="dz-hint">Multiple files · Phase 1 / Phase 4 / Reference auto-detected</div>
   </div>
-  
   <input type="file" id="file-input" accept=".csv" multiple>
-  
   <div id="file-list"></div>
-  
-  <button id="load-btn" onclick="loadFiles()">LOAD DATA</button>
-  
-  <div id="loading-bar-wrap">
-    <div id="loading-bar"></div>
+  <button id="load-btn" onclick="loadFiles()">Load into Dashboard</button>
+  <div id="loading-wrap">
+    <div id="loading-bar-outer"><div id="loading-bar"></div></div>
+    <div id="loading-text"></div>
+    <div id="loading-sub"></div>
   </div>
-  <div id="loading-text">Initializing...</div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════════
-     MAIN APPLICATION UI
-     ══════════════════════════════════════════════════════════════════════ -->
+<!-- ══════════ MAIN APP ══════════ -->
 <div id="app">
-  <!-- Header -->
+
+  <!-- HEADER -->
   <div id="header">
-    <h1>Antarctica Meltwater Research Dashboard</h1>
-    <span class="subtitle">Dual-Mode Platform: Manual Data Labelling & ML Prediction Visualization</span>
+    <div class="hdr-l">
+      <div class="live-dot"></div>
+      <span class="hdr-title">MeltWatch · Antarctic Meltwater</span>
+      <div class="hdr-pipe"></div>
+      <span class="hdr-sub">Dual-GMM · 9-Feature · CReSIS MCoRDS</span>
+    </div>
+    <div class="hdr-r">
+      <div class="hstat"><span class="hstat-lbl">Traces</span><span class="hstat-val" id="h-total">—</span></div>
+      <div class="hstat"><span class="hstat-lbl">Melt</span><span class="hstat-val c-red" id="h-melt">—</span></div>
+      <div class="hstat"><span class="hstat-lbl">Visible</span><span class="hstat-val" id="h-visible">—</span></div>
+      <div class="hstat"><span class="hstat-lbl">Fraction</span><span class="hstat-val c-gold" id="h-pct">—</span></div>
+      <div id="hint-btn" onclick="toggleKeys()"><kbd>?</kbd> shortcuts</div>
+    </div>
   </div>
-  
-  <!-- Sidebar -->
+
+  <!-- SIDEBAR -->
   <div id="sidebar">
-    <!-- Add More CSVs Button -->
-    <button id="add-more-btn" onclick="openUploadModal()">📁 Add More CSVs</button>
-    
-    <!-- Dataset Stats -->
-    <div class="sidebar-section">
-      <div class="section-label">Dataset Statistics</div>
-      <div class="stat-row">
-        <span class="stat-key">Total Traces Loaded</span>
-        <span class="stat-value" id="s-total">0</span>
-      </div>
-      <div class="stat-row">
-        <span class="stat-key">Files Loaded</span>
-        <span class="stat-value" id="s-files">0</span>
-      </div>
+    <div id="sb-toggle" onclick="toggleSidebar()">
+      <span class="tog-icon">‹</span>
     </div>
-    
-    <!-- Phase 4 Predictions -->
-    <div class="sidebar-section">
-      <div class="section-label">Phase 4 · ML Predictions</div>
-      <div class="stat-row">
-        <span class="stat-key" style="color: var(--red-melt);">🔴 Predicted Meltwater</span>
-        <span class="stat-value" id="s-pred-melt">0</span>
+    <div class="sb-scroll">
+
+      <!-- brand -->
+      <div class="sb-brand">
+        <div class="sb-brand-row">
+          <div class="sb-mark">M</div>
+          <span class="sb-name">MeltWatch</span>
+        </div>
+        <div class="sb-ver">v5.1 · Surface Meltwater Detection System</div>
       </div>
-      <div class="stat-row">
-        <span class="stat-key" style="color: var(--deep-ice);">🔵 Predicted Ice</span>
-        <span class="stat-value" id="s-pred-ice">0</span>
+
+      <!-- actions -->
+      <div class="sec">
+        <span class="sec-lbl">Actions</span>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div class="sb-btn" onclick="openUploadModal()" style="cursor:pointer;pointer-events:all">+ Add More CSV Batches</div>
+          <div class="sb-btn-pair">
+            <div class="sb-btn" onclick="flyToAntarctica()" style="cursor:pointer;pointer-events:all">🌐 S. Pole</div>
+            <div class="sb-btn" onclick="flyToData()" style="cursor:pointer;pointer-events:all">📍 Data</div>
+          </div>
+        </div>
       </div>
-      <div class="stat-row">
-        <span class="stat-key" style="color: var(--gold-select);">⚡ Melt Percentage</span>
-        <span class="stat-value" id="s-pred-pct">0.00%</span>
+
+      <!-- fly to coordinates -->
+      <div class="sec">
+        <span class="sec-lbl">Fly to Coordinates</span>
+        <div class="coord-row">
+          <input class="coord-input" id="coord-lat" type="text" placeholder="Lat  e.g. -77.5">
+          <input class="coord-input" id="coord-lon" type="text" placeholder="Lon  e.g. 163.7">
+          <div class="coord-go" onclick="flyToCoords()" title="Go to coordinates">→</div>
+        </div>
       </div>
-    </div>
-    
-    <!-- Phase 1 Manual Labels -->
-    <div class="sidebar-section">
-      <div class="section-label">Phase 1 · Manual Labels</div>
-      <div class="stat-row">
-        <span class="stat-key" style="color: var(--ocean-green);">🌊 Ocean (Label = 1)</span>
-        <span class="stat-value" id="s-ocean">0</span>
+
+      <!-- dataset -->
+      <div class="sec">
+        <span class="sec-lbl">Dataset</span>
+        <div class="stat-row">
+          <span class="stat-k"><span class="s-pip" style="background:rgba(255,255,255,.3)"></span>Traces Loaded</span>
+          <span class="stat-v" id="s-total">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-k"><span class="s-pip" style="background:rgba(255,255,255,.15)"></span>Files Loaded</span>
+          <span class="stat-v" id="s-files">0</span>
+        </div>
       </div>
-      <div class="stat-row">
-        <span class="stat-key" style="color: var(--ice-blue);">🧊 Interior (Label = 0)</span>
-        <span class="stat-value" id="s-ice">0</span>
+
+      <!-- ── PHASE 4 ── -->
+      <div id="p4-panel">
+        <div class="sec">
+          <span class="sec-lbl red">Phase 4 · ML Predictions</span>
+          <div class="slider-card">
+            <div class="slider-top">
+              <span class="slider-lbl">Confidence<br>Threshold Filter</span>
+              <span class="slider-num" id="slider-badge">≥ 95%</span>
+            </div>
+            <input type="range" id="threshold-slider" min="0" max="100" step="1" value="95"
+                   oninput="onSliderChange(this.value)">
+            <div class="tick-row"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+            <div class="presets" id="preset-btns">
+              <div class="pst" onclick="setThreshold(50)">50%</div>
+              <div class="pst" onclick="setThreshold(75)">75%</div>
+              <div class="pst" onclick="setThreshold(90)">90%</div>
+              <div class="pst active" onclick="setThreshold(95)">95%</div>
+              <div class="pst" onclick="setThreshold(99)">99%</div>
+            </div>
+            <div class="vis-row">
+              <div class="vis-cell">
+                <div class="vc-lbl">Visible Melt</div>
+                <div class="vc-val red" id="s-vis-melt">0</div>
+              </div>
+              <div class="vis-cell">
+                <div class="vc-lbl">Ice Traces</div>
+                <div class="vc-val blue" id="s-vis-ice">0</div>
+              </div>
+            </div>
+          </div>
+          <!-- histogram -->
+          <div id="hist-wrap">
+            <div class="hist-title">Melt Probability Distribution</div>
+            <canvas id="hist-canvas"></canvas>
+            <div class="hist-axis"><span>0.0</span><span>0.5</span><span>1.0</span></div>
+          </div>
+          <div class="stat-row" style="margin-top:6px">
+            <span class="stat-k"><span class="s-pip" style="background:var(--red)"></span>Total Melt Detections</span>
+            <span class="stat-v" style="color:var(--red)" id="s-pred-melt">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-k"><span class="s-pip" style="background:var(--ice)"></span>Total Ice Predictions</span>
+            <span class="stat-v" style="color:var(--ice)" id="s-pred-ice">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-k"><span class="s-pip" style="background:var(--gold)"></span>Melt Fraction</span>
+            <span class="stat-v" style="color:var(--gold)" id="s-pred-pct">0.00%</span>
+          </div>
+        </div>
       </div>
-    </div>
-    
-    <!-- Camera Controls -->
-    <div class="sidebar-section">
-      <div class="section-label">Camera Shortcuts</div>
-      <div class="btn-row">
-        <div class="btn" onclick="flyToAntarctica()">🌐 Antarctica</div>
-        <div class="btn" onclick="flyToData()">📍 Data Extent</div>
+
+      <!-- phase 1 labels -->
+      <div class="sec">
+        <span class="sec-lbl blue">Phase 1 · Manual Labels</span>
+        <div class="stat-row">
+          <span class="stat-k"><span class="s-pip" style="background:var(--green)"></span>Ocean (Label = 1)</span>
+          <span class="stat-v" style="color:var(--green)" id="s-ocean">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-k"><span class="s-pip" style="background:var(--ice)"></span>Interior (Label = 0)</span>
+          <span class="stat-v" style="color:var(--ice)" id="s-ice">0</span>
+        </div>
       </div>
-    </div>
-    
-    <!-- Legend -->
-    <div class="sidebar-section">
-      <div class="section-label">Color Legend</div>
-      <div class="legend-row">
-        <div class="legend-dot" style="background: var(--red-melt);"></div>
-        <span>ML Predicted Meltwater (Phase 4)</span>
+
+      <!-- legend -->
+      <div class="sec">
+        <span class="sec-lbl">Colour Scale · Melt Probability (Phase 4)</span>
+        <div class="ramp-bar"></div>
+        <div class="ramp-labels"><span>Ice (0%)</span><span>Uncertain</span><span>Melt (100%)</span></div>
+        <div style="height:8px"></div>
+        <div class="leg-row"><div class="leg-pip" style="background:var(--green)"></div><span class="leg-txt">Manual label: Ocean</span></div>
+        <div class="leg-row"><div class="leg-pip" style="background:var(--ice)"></div><span class="leg-txt">Manual label: Interior</span></div>
+        <div class="leg-row"><div class="leg-pip" style="background:var(--gold)"></div><span class="leg-txt">Selected (polygon)</span></div>
+        <div class="leg-row"><div class="leg-pip" style="background:#5a7a9a;opacity:.5"></div><span class="leg-txt">Unlabelled metadata</span></div>
+        <div class="leg-row"><div class="leg-pip" style="background:#ff00ff"></div><span class="leg-txt">Reference: Subglacial Lake</span></div>
+        <div class="leg-row"><div class="leg-pip" style="background:#00e5ff"></div><span class="leg-txt">Reference: Interior Ice</span></div>
       </div>
-      <div class="legend-row">
-        <div class="legend-dot" style="background: var(--deep-ice); opacity: 0.8;"></div>
-        <span>ML Predicted Ice (Phase 4)</span>
-      </div>
-      <div class="legend-row">
-        <div class="legend-dot" style="background: var(--ocean-green);"></div>
-        <span>Manual Label: Ocean (Phase 1)</span>
-      </div>
-      <div class="legend-row">
-        <div class="legend-dot" style="background: var(--ice-blue);"></div>
-        <span>Manual Label: Interior (Phase 1)</span>
-      </div>
-      <div class="legend-row">
-        <div class="legend-dot" style="background: var(--gold-select);"></div>
-        <span>Selected (In Polygon)</span>
-      </div>
-      <div class="legend-row">
-        <div class="legend-dot" style="background: #8ab4f8; opacity: 0.6;"></div>
-        <span>Unlabelled Raw Metadata</span>
-      </div>
-    </div>
-    
-    <!-- Export Controls -->
-    <div id="export-wrap">
-      <div id="export-btn" class="disabled" onclick="exportSelection()">
+
+    </div><!-- /sb-scroll -->
+
+    <div class="sb-footer">
+      <div id="export-btn" class="sb-btn sb-btn-gold disabled"
+           onclick="exportSelection()" style="cursor:pointer;pointer-events:all">
         No Labels to Export
       </div>
-      <div id="clear-all-btn" onclick="clearAllLabels()">✕ Clear Phase 1 Labels</div>
+      <div id="clear-all-btn" class="sb-btn sb-btn-danger"
+           onclick="clearAllLabels()" style="cursor:pointer;pointer-events:all">
+        Clear Phase 1 Labels
+      </div>
     </div>
-  </div>
-  
-  <!-- Drawing Toolbar -->
+  </div><!-- /sidebar -->
+
+  <!-- DRAWING TOOLBAR -->
   <div id="draw-toolbar">
-    <div class="dtool" id="dtool-draw" onclick="toggleDraw()" title="Draw Polygon">✏️</div>
-    <div class="dtool" onclick="undoVertex()" title="Undo Vertex">↩️</div>
-    <div class="dtool" onclick="clearDrawing()" title="Clear Polygon">🗑️</div>
-  </div>
-  
-  <!-- Label Assignment Panel -->
-  <div id="label-panel">
-    <div id="lp-title">Assign Label to Selection</div>
-    <div id="lp-count">0 traces selected</div>
-    <div class="btn-row" style="flex-direction: column;">
-      <div class="lp-btn lp-ocean" onclick="assignLabel(1)">🌊 Ocean (Label = 1)</div>
-      <div class="lp-btn lp-ice" onclick="assignLabel(0)">🧊 Interior (Label = 0)</div>
-      <div class="lp-btn lp-remove" onclick="assignLabel(undefined)">🧹 Remove Label</div>
-      <div class="lp-btn lp-cancel" onclick="cancelSelection()">✕ Cancel</div>
+    <div class="dtool" id="dtool-draw" onclick="toggleDraw()">
+      ✏️<span class="dtip">Draw polygon (D)</span>
     </div>
+    <div class="dtool" onclick="undoVertex()">
+      ↩<span class="dtip">Undo vertex (Z)</span>
+    </div>
+    <div class="dtool" onclick="clearDrawing()">
+      ✕<span class="dtip">Clear (Esc)</span>
+    </div>
+    <div class="tb-sep"></div>
+    <div id="vtx-badge">0 vertices</div>
+  </div>
+
+  <!-- LABEL PANEL -->
+  <div id="label-panel">
+    <div id="lp-title">Assign Label</div>
+    <div id="lp-count">0 traces selected</div>
+    <div class="lp-btns">
+      <div class="lp-btn lp-ocean"  onclick="assignLabel(1)">Mark as Ocean / Meltwater (Label = 1)</div>
+      <div class="lp-btn lp-ice"    onclick="assignLabel(0)">Mark as Ice Interior (Label = 0)</div>
+      <div class="lp-btn lp-remove" onclick="assignLabel(undefined)">Remove Label</div>
+      <div class="lp-btn lp-cancel" onclick="cancelSelection()">Cancel</div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- TOOLTIP -->
+<div id="hover-tooltip">
+  <div class="tt-bar" id="tt-bar"></div>
+  <div class="tt-body" id="tt-body"></div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- KEYBOARD SHORTCUTS -->
+<div id="keys-overlay" onclick="toggleKeys()">
+  <div class="keys-card" onclick="event.stopPropagation()">
+    <div class="keys-title">Keyboard Shortcuts</div>
+    <div class="keys-grid">
+      <div class="key-row"><span class="key-desc">Toggle draw mode</span><kbd>D</kbd></div>
+      <div class="key-row"><span class="key-desc">Undo last vertex</span><kbd>Z</kbd></div>
+      <div class="key-row"><span class="key-desc">Clear drawing</span><kbd>Esc</kbd></div>
+      <div class="key-row"><span class="key-desc">Fly to South Pole</span><kbd>A</kbd></div>
+      <div class="key-row"><span class="key-desc">Fly to data extent</span><kbd>F</kbd></div>
+      <div class="key-row"><span class="key-desc">Toggle sidebar</span><kbd>S</kbd></div>
+      <div class="key-row"><span class="key-desc">Add more CSVs</span><kbd>O</kbd></div>
+      <div class="key-row"><span class="key-desc">This help screen</span><kbd>?</kbd></div>
+    </div>
+    <div class="keys-close" onclick="toggleKeys()">Press any key or click outside to close</div>
   </div>
 </div>
 
-<!-- Hover Tooltip -->
-<div id="hover-tooltip"></div>
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     JAVASCRIPT APPLICATION
-     ══════════════════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════════ -->
 <script>
 'use strict';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   1. CESIUM INITIALIZATION
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   1. CESIUM INIT
+═══════════════════════════════════════════════════ */
+Cesium.Ion.defaultAccessToken =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
+  'eyJqdGkiOiJiYjg2ZjQ0ZC02YWNhLTQyNGYtYjAyYS01YzY1MzgxNTk0OTEiLCJpZCI6' +
+  'NDAxMjI5LCJpYXQiOjE3NzMxMzMyMzF9.' +
+  '5Hwu9ciIqd3qfmaYCdTykSNO3Osnq-k1x0gVhOoZ2iI';
 
-// Replace with your Cesium Ion access token
-Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiYjg2ZjQ0ZC02YWNhLTQyNGYtYjAyYS01YzY1MzgxNTk0OTEiLCJpZCI6NDAxMjI5LCJpYXQiOjE3NzMxMzMyMzF9.5Hwu9ciIqd3qfmaYCdTykSNO3Osnq-k1x0gVhOoZ2iI";
-
-const viewer = new Cesium.Viewer("cesiumContainer", {
-  animation: false,
-  timeline: false,
-  baseLayerPicker: false,
-  geocoder: false,
-  homeButton: false,
-  sceneModePicker: false,
-  navigationHelpButton: false,
-  fullscreenButton: false,
-  infoBox: false,
-  selectionIndicator: false,
+const viewer = new Cesium.Viewer('cesiumContainer', {
+  animation:false, timeline:false, baseLayerPicker:false,
+  geocoder:false, homeButton:false, sceneModePicker:false,
+  navigationHelpButton:false, fullscreenButton:false,
+  infoBox:false, selectionIndicator:false,
   terrain: Cesium.Terrain.fromWorldTerrain(),
-  skyBox: new Cesium.SkyBox({
-    sources: {
-      positiveX: 'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_px.jpg',
-      negativeX: 'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mx.jpg',
-      positiveY: 'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_py.jpg',
-      negativeY: 'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_my.jpg',
-      positiveZ: 'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_pz.jpg',
-      negativeZ: 'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg'
-    }
-  })
+  skyBox: new Cesium.SkyBox({ sources: {
+    positiveX:'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_px.jpg',
+    negativeX:'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mx.jpg',
+    positiveY:'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_py.jpg',
+    negativeY:'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_my.jpg',
+    positiveZ:'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_pz.jpg',
+    negativeZ:'https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg'
+  }})
 });
-
-const scene = viewer.scene;
+const scene  = viewer.scene;
 const camera = viewer.camera;
-scene.globe.enableLighting = false;
-scene.globe.baseColor = Cesium.Color.fromCssColorString('#04080f');
+scene.globe.enableLighting  = false;
+scene.globe.baseColor        = Cesium.Color.BLACK;
+viewer.useDefaultRenderLoop  = true;
 
-/* ═══════════════════════════════════════════════════════════════════════
-   2. GLOBAL STATE MANAGEMENT
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   2. STATE
+═══════════════════════════════════════════════════ */
+let allPoints       = [];
+let pointCollection = null;
+let loadedFiles     = new Set();
+let currentPhase    = null;
+let currentThreshold = 0.95;
+let lastHoverIdx    = -1;
+let coordMarkerEnt  = null;   // entity for fly-to marker
 
-// ── Data Storage ────────────────────────────────────────────────────────
-let allPoints = [];              // Master array of all trace points
-let pointCollection = null;      // Cesium PointPrimitiveCollection for rendering
-let loadedFiles = new Set();     // Track which files have been loaded
-let currentPhase = null;         // 'phase1' or 'phase4' - auto-detected
+// Drawing state
+let drawMode        = false;
+let vertices        = [];
+let vertexEntities  = [];
+let polylineEnt     = null;
+let polygonEnt      = null;
+let selectedIndices = [];
 
-// ── Drawing State ───────────────────────────────────────────────────────
-let drawMode = false;            // Is polygon drawing active?
-let vertices = [];               // Current polygon vertices (Cartesian3)
-let vertexEntities = [];         // Visual markers for vertices
-let polylineEnt = null;          // Entity for polygon outline
-let polygonEnt = null;           // Entity for filled polygon
+/* ═══════════════════════════════════════════════════
+   3. COLOUR HELPERS
+═══════════════════════════════════════════════════ */
+const RGB_ICE   = [80,  144, 184];
+const RGB_AMBER = [232, 160,  32];
+const RGB_MELT  = [229,  62,  62];
 
-// ── Selection State ─────────────────────────────────────────────────────
-let selectedIndices = [];        // Indices of points inside current polygon
+function lerpRGB(a, b, t) {
+  return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+}
 
-// ── Color Definitions ───────────────────────────────────────────────────
-const COLORS = {
-  PHASE1_UNLABELED: Cesium.Color.fromCssColorString('#8ab4f8').withAlpha(0.6),
-  OCEAN_LABEL:      Cesium.Color.fromCssColorString('#00e890').withAlpha(1.0),
-  ICE_LABEL:        Cesium.Color.fromCssColorString('#4ab8ff').withAlpha(1.0),
-  SELECTED:         Cesium.Color.fromCssColorString('#ffd93d').withAlpha(1.0),
-  PRED_MELTWATER:   Cesium.Color.fromCssColorString('#ff3838').withAlpha(1.0),
-  PRED_ICE:         Cesium.Color.fromCssColorString('#1a5a9a').withAlpha(0.7),
+function probToCesiumColor(prob) {
+  if (prob === undefined || prob === null) return Cesium.Color.fromBytes(80,144,184,45);
+  const t = Math.max(0, Math.min(1, prob));
+  const rgb = t < 0.5 ? lerpRGB(RGB_ICE, RGB_AMBER, t*2) : lerpRGB(RGB_AMBER, RGB_MELT, (t-0.5)*2);
+  const alpha = Math.round((0.35 + t*0.65) * 255);
+  return Cesium.Color.fromBytes(Math.round(rgb[0]), Math.round(rgb[1]), Math.round(rgb[2]), alpha);
+}
+
+function probToHex(prob) {
+  const t = Math.max(0, Math.min(1, prob || 0));
+  const rgb = t < 0.5 ? lerpRGB(RGB_ICE, RGB_AMBER, t*2) : lerpRGB(RGB_AMBER, RGB_MELT, (t-0.5)*2);
+  return '#' + rgb.map(v => Math.round(v).toString(16).padStart(2,'0')).join('');
+}
+
+const C = {
+  UNLABELED: Cesium.Color.fromBytes(90,120,154,65),
+  OCEAN:     Cesium.Color.fromCssColorString('#3dba76'),
+  ICE_LBL:   Cesium.Color.fromCssColorString('#5090b8'),
+  SELECTED:  Cesium.Color.fromCssColorString('#d4900f'),
+  ICE_PRED:  Cesium.Color.fromBytes(80,144,184,32),
+  REF_OCEAN: Cesium.Color.fromCssColorString('#ff00ff'),   // magenta — subglacial lake
+  REF_ICE:   Cesium.Color.fromCssColorString('#00e5ff'),   // cyan — interior ice
 };
 
-/* ═══════════════════════════════════════════════════════════════════════
-   3. COLOR & SIZE LOGIC
-   ═══════════════════════════════════════════════════════════════════════ */
-
-/**
- * Determine the color of a point based on its state and data.
- * Priority: Selection > Manual Label > ML Prediction > Default
- */
-function getPointColor(point, index) {
-  if (selectedIndices.includes(index)) return COLORS.SELECTED;
-  if (point.label === 1) return COLORS.OCEAN_LABEL;
-  if (point.label === 0) return COLORS.ICE_LABEL;
-  if (point.consensus === 1) return COLORS.PRED_MELTWATER;
-  if (point.consensus === 0) return COLORS.PRED_ICE;
-  return COLORS.PHASE1_UNLABELED;
+function ptColor(pt, idx) {
+  if (selectedIndices.includes(idx)) return C.SELECTED;
+  if (pt.isRef && pt.refType === 'ocean') return C.REF_OCEAN;
+  if (pt.isRef && pt.refType === 'ice')   return C.REF_ICE;
+  if (pt.label === 1) return C.OCEAN;
+  if (pt.label === 0) return C.ICE_LBL;
+  if (pt.consensus !== undefined) return probToCesiumColor(pt.melt_prob);
+  return C.UNLABELED;
 }
 
-/**
- * Determine the size of a point based on its state.
- */
-function getPointSize(point, index) {
-  if (selectedIndices.includes(index)) return 6;
-  if (point.label !== undefined) return 5;
-  if (point.consensus === 1) return 5; // Meltwater pops more
-  if (point.consensus === 0) return 4;
-  return 3;
+function ptSize(pt, idx) {
+  if (selectedIndices.includes(idx)) return 8;
+  if (pt.isRef) return 9;
+  if (pt.label !== undefined) return 5;
+  if (pt.consensus === 1) return 4 + Math.round((pt.melt_prob||0)*3);
+  if (pt.consensus === 0) return 2;
+  return 2;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   4. FILE UPLOAD & MODAL MANAGEMENT
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   4. SLIDER
+═══════════════════════════════════════════════════ */
+function paintSlider(pct) {
+  const el = document.getElementById('threshold-slider');
+  el.style.background =
+    `linear-gradient(to right,#e53e3e 0%,#e53e3e ${pct}%,#1e1e1e ${pct}%,#1e1e1e 100%)`;
+  document.getElementById('slider-num') && (document.getElementById('slider-badge').style.color =
+    pct >= 90 ? '#e53e3e' : pct >= 70 ? '#e8a020' : '#5090b8');
+}
 
-const fileInput = document.getElementById('file-input');
-const dropZone = document.getElementById('drop-zone');
-let pendingFiles = [];
+function onSliderChange(raw) {
+  const pct = parseInt(raw, 10);
+  currentThreshold = pct / 100;
+  document.getElementById('slider-badge').textContent = `\u2265 ${pct}%`;
+  paintSlider(pct);
+  document.querySelectorAll('.pst').forEach(b => {
+    b.classList.toggle('active', parseInt(b.textContent) === pct);
+  });
+  applyThreshold();
+}
 
-// ── Drag & Drop Event Handlers ──────────────────────────────────────────
-dropZone.addEventListener('dragover', e => {
-  e.preventDefault();
-  dropZone.classList.add('drag-over');
-});
+function setThreshold(pct) {
+  document.getElementById('threshold-slider').value = pct;
+  onSliderChange(pct);
+}
 
-dropZone.addEventListener('dragleave', () => {
-  dropZone.classList.remove('drag-over');
-});
+function applyThreshold() {
+  if (!pointCollection || currentPhase !== 'phase4') return;
+  let visMelt = 0, totIce = 0;
+  for (let i = 0; i < allPoints.length; i++) {
+    const pt   = allPoints[i];
+    const prim = pointCollection.get(i);
+    if (!prim) continue;
+    if (pt.consensus === 1) {
+      const show = (typeof pt.melt_prob === 'number') && (pt.melt_prob >= currentThreshold);
+      prim.show  = show;
+      if (show) visMelt++;
+    } else if (pt.consensus === 0) {
+      prim.show = true; totIce++;
+    } else {
+      prim.show = true;
+    }
+  }
+  setEl('s-vis-melt', visMelt.toLocaleString());
+  setEl('s-vis-ice',  totIce.toLocaleString());
+  setEl('h-visible',  visMelt.toLocaleString());
+  scene.requestRender();
+  drawHistogram();
+}
 
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('drag-over');
-  addFiles([...e.dataTransfer.files]);
-});
+/* ═══════════════════════════════════════════════════
+   5. HISTOGRAM
+═══════════════════════════════════════════════════ */
+function drawHistogram() {
+  const canvas = document.getElementById('hist-canvas');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.offsetWidth || 230;
+  const H   = 44;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
 
-fileInput.addEventListener('change', e => {
-  addFiles([...e.target.files]);
-});
+  const probs = allPoints
+    .filter(p => p.consensus === 1 && typeof p.melt_prob === 'number')
+    .map(p => p.melt_prob);
 
-/**
- * Add files to the pending upload queue and update the UI.
- */
-function addFiles(files) {
-  const csvFiles = files.filter(f => f.name.toLowerCase().endsWith('.csv'));
-  if (!csvFiles.length) {
-    alert('Please upload CSV files only.');
+  ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0,0,W,H);
+
+  if (!probs.length) {
+    ctx.fillStyle = '#333'; ctx.font = '9px Inter';
+    ctx.textAlign = 'center'; ctx.fillText('No Phase 4 data', W/2, H/2+3);
     return;
   }
-  
-  // Add new files (avoid duplicates)
-  csvFiles.forEach(f => {
-    if (!pendingFiles.some(p => p.name === f.name)) {
-      pendingFiles.push(f);
-    }
+
+  const BINS = 40;
+  const bins = new Array(BINS).fill(0);
+  probs.forEach(p => { bins[Math.min(BINS-1, Math.floor(p*BINS))]++; });
+  const maxBin = Math.max(...bins, 1);
+
+  // Threshold shading
+  const tx = currentThreshold * W;
+  ctx.fillStyle = 'rgba(229,62,62,.07)'; ctx.fillRect(tx, 0, W-tx, H);
+  ctx.strokeStyle = 'rgba(229,62,62,.45)'; ctx.lineWidth = 1;
+  ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(tx,0); ctx.lineTo(tx,H); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Bars
+  const barW = W / BINS;
+  bins.forEach((count, i) => {
+    const t = i/(BINS-1);
+    const rgb = t < 0.5 ? lerpRGB(RGB_ICE, RGB_AMBER, t*2) : lerpRGB(RGB_AMBER, RGB_MELT, (t-0.5)*2);
+    const barH = (count/maxBin)*(H-4);
+    ctx.fillStyle = `rgba(${Math.round(rgb[0])},${Math.round(rgb[1])},${Math.round(rgb[2])},0.75)`;
+    ctx.fillRect(i*barW, H-barH, barW-0.5, barH);
   });
-  
-  // Update file list UI
-  const fileListEl = document.getElementById('file-list');
-  fileListEl.innerHTML = '';
-  pendingFiles.forEach(f => {
-    const sizeText = (f.size / 1e6).toFixed(2) + ' MB';
-    fileListEl.innerHTML += `
-      <div class="file-item">
-        <span class="file-name">📄 ${f.name}</span>
-        <span class="file-size">${sizeText}</span>
-      </div>
-    `;
-  });
-  
+}
+
+/* ═══════════════════════════════════════════════════
+   6. TOAST
+═══════════════════════════════════════════════════ */
+let toastTimer = null;
+function toast(msg, ms=2200) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+/* ═══════════════════════════════════════════════════
+   7. FILE UPLOAD
+═══════════════════════════════════════════════════ */
+const fileInput = document.getElementById('file-input');
+const dropZone  = document.getElementById('drop-zone');
+let   pendingFiles = [];
+
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  addFiles([...e.dataTransfer.files]);
+});
+fileInput.addEventListener('change', e => { addFiles([...e.target.files]); e.target.value=''; });
+
+function addFiles(files) {
+  const csv = files.filter(f => f.name.toLowerCase().endsWith('.csv'));
+  if (!csv.length) { toast('Please upload .csv files only'); return; }
+  csv.forEach(f => { if (!pendingFiles.some(p => p.name===f.name)) pendingFiles.push(f); });
+  renderFileList();
   document.getElementById('load-btn').style.display = 'block';
 }
 
-/**
- * Open the upload modal (for "Add More CSVs" button).
- */
+function renderFileList() {
+  const el = document.getElementById('file-list');
+  el.innerHTML = '';
+  pendingFiles.forEach((f, i) => {
+    const d = document.createElement('div');
+    d.className = 'file-item';
+    d.innerHTML = `<span class="file-name">${f.name}</span>
+      <span class="file-size">${(f.size/1e6).toFixed(2)} MB</span>
+      <span class="file-x" onclick="removeFile(${i})">✕</span>`;
+    el.appendChild(d);
+  });
+}
+
+function removeFile(idx) {
+  pendingFiles.splice(idx, 1);
+  renderFileList();
+  if (!pendingFiles.length) document.getElementById('load-btn').style.display = 'none';
+}
+
 function openUploadModal() {
   pendingFiles = [];
   fileInput.value = '';
   document.getElementById('upload-modal').classList.remove('hidden');
   document.getElementById('file-list').innerHTML = '';
   document.getElementById('load-btn').style.display = 'none';
-  document.getElementById('loading-bar-wrap').style.display = 'none';
-  document.getElementById('loading-text').style.display = 'none';
+  document.getElementById('loading-wrap').style.display = 'none';
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   5. CSV PARSING WITH PAPAPARSE
-   ═══════════════════════════════════════════════════════════════════════ */
-
-/**
- * Detect whether a CSV is Phase 1 or Phase 4 based on headers.
- * Phase 1: filename, segment, trace_idx, latitude, longitude
- * Phase 4: Same + consensus_meltwater, melt_prob, etc.
- */
-function detectPhase(headers) {
-  const h = headers.map(x => x.toLowerCase());
-  const hasConsensus = h.includes('consensus_meltwater');
-  const hasMeltProb = h.includes('melt_prob');
-  
-  if (hasConsensus || hasMeltProb) {
-    return 'phase4';
-  }
+/* ═══════════════════════════════════════════════════
+   8. CSV PARSING
+   ─────────────────────────────────────────────────
+   THREE file types auto-detected:
+   • phase1  — filename,segment,trace_idx,latitude,longitude
+   • phase4  — same + melt_prob,consensus_meltwater + features
+   • reference — name,latitude,longitude,type,description
+═══════════════════════════════════════════════════ */
+function detectFileType(headers) {
+  const h = headers.map(x => x.toLowerCase().trim());
+  if (h.includes('melt_prob') || h.includes('consensus_meltwater')) return 'phase4';
+  if (h.includes('type') && h.includes('name') && h.includes('description')) return 'reference';
   return 'phase1';
 }
 
-/**
- * Parse a single CSV file using PapaParse.
- * Returns a promise that resolves to an array of point objects.
- */
+function sf(row, key) {
+  const v = row[key];
+  if (v===null||v===undefined||v==='') return undefined;
+  const n = parseFloat(v);
+  return isNaN(n) ? undefined : n;
+}
+
 function parseCSVFile(file) {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      dynamicTyping: true,
-      complete: function(results) {
-        if (!results.data || results.data.length === 0) {
-          reject(new Error('CSV file is empty or invalid'));
-          return;
+      header:true, skipEmptyLines:true, dynamicTyping:false,
+      complete(results) {
+        if (!results.data?.length) { reject(new Error('Empty CSV')); return; }
+        const headers  = results.meta.fields || [];
+        const fileType = detectFileType(headers);
+
+        let points = [];
+
+        if (fileType === 'reference') {
+          points = results.data.map(row => ({
+            lat:     sf(row,'latitude')  || 0,
+            lon:     sf(row,'longitude') || 0,
+            name:    row.name || 'Reference',
+            refType: (row.type||'').toLowerCase().trim(),
+            desc:    row.description || '',
+            isRef:   true,
+          })).filter(p => !isNaN(p.lat) && !isNaN(p.lon));
+        } else {
+          points = results.data.map(row => {
+            const pt = {
+              lat:       sf(row,'latitude')  ?? sf(row,'Latitude')  ?? 0,
+              lon:       sf(row,'longitude') ?? sf(row,'Longitude') ?? 0,
+              filename:  (row.filename||row.file||'unknown').trim(),
+              segment:   (row.segment||'').trim(),
+              trace_idx: row.trace_idx!==undefined ? parseInt(row.trace_idx,10) : null,
+            };
+            if (fileType === 'phase4') {
+              const cRaw = row.consensus_meltwater;
+              pt.consensus = (cRaw!==undefined&&cRaw!=='') ? parseInt(cRaw,10) : undefined;
+              pt.melt_prob         = sf(row,'melt_prob');
+              pt.peak_power_db     = sf(row,'peak_power_db');
+              pt.echo_energy_db    = sf(row,'echo_energy_db');
+              pt.leading_edge_slope= sf(row,'leading_edge_slope');
+              pt.texture_variance  = sf(row,'texture_variance');
+              pt.local_contrast    = sf(row,'local_contrast');
+              pt.waveform_coherence= sf(row,'waveform_coherence');
+              pt.rsr_pc            = sf(row,'rsr_pc');
+              pt.rsr_pn            = sf(row,'rsr_pn');
+              pt.rsr_specularity   = sf(row,'rsr_specularity');
+              pt.echo_width_fwhm   = sf(row,'echo_width_fwhm');
+              pt.skewness          = sf(row,'skewness');
+              pt.kurtosis          = sf(row,'kurtosis');
+            }
+            return pt;
+          }).filter(p => !isNaN(p.lat)&&!isNaN(p.lon)&&p.lat!==0&&p.lon!==0);
         }
-        
-        // Detect phase from headers
-        const headers = results.meta.fields;
-        const phase = detectPhase(headers);
-        
-        // Map rows to point objects
-        const points = results.data.map(row => {
-          const pt = {
-            lat: row.latitude || row.Latitude,
-            lon: row.longitude || row.Longitude,
-            filename: row.filename || 'unknown',
-            segment: row.segment || 'unknown',
-            trace_idx: row.trace_idx !== undefined ? row.trace_idx : null,
-          };
-          
-          // Phase 4 specific fields
-          if (phase === 'phase4') {
-            pt.consensus = row.consensus_meltwater;
-            pt.melt_prob = row.melt_prob;
-            pt.peak_power_db = row.peak_power_db;
-            pt.echo_width_fwhm = row.echo_width_fwhm;
-            pt.rsr_specularity = row.rsr_specularity;
-            // Add other physics features as needed
-          }
-          
-          return pt;
-        }).filter(pt => {
-          // Filter out invalid coordinates
-          return pt.lat !== null && pt.lat !== undefined && 
-                 pt.lon !== null && pt.lon !== undefined &&
-                 !isNaN(pt.lat) && !isNaN(pt.lon);
-        });
-        
-        resolve({ points, phase });
+        resolve({ points, fileType });
       },
-      error: function(error) {
-        reject(error);
-      }
+      error: reject
     });
   });
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   6. CHUNKED POINT LOADING (PERFORMANCE OPTIMIZATION)
-   ═══════════════════════════════════════════════════════════════════════ */
-
-/**
- * Add points to the Cesium scene in chunks to prevent browser freeze.
- * Uses requestAnimationFrame for smooth rendering.
- */
-function addPointsInChunks(points, chunkSize = 5000) {
-  return new Promise((resolve) => {
-    let index = 0;
-    
-    function processChunk() {
-      const end = Math.min(index + chunkSize, points.length);
-      
-      for (let i = index; i < end; i++) {
-        const pt = points[i];
-        
-        // Add to master array
-        const globalIndex = allPoints.length;
+/* ═══════════════════════════════════════════════════
+   9. CHUNKED POINT LOADING
+═══════════════════════════════════════════════════ */
+function addPointsInChunks(points, chunkSize=6000) {
+  return new Promise(resolve => {
+    let i = 0;
+    function chunk() {
+      const end = Math.min(i+chunkSize, points.length);
+      for (; i < end; i++) {
+        const pt  = points[i];
+        const idx = allPoints.length;
         allPoints.push(pt);
-        
-        // Add to Cesium point collection
         pointCollection.add({
-          position: Cesium.Cartesian3.fromDegrees(pt.lon, pt.lat),
-          color: getPointColor(pt, globalIndex),
-          pixelSize: getPointSize(pt, globalIndex),
+          id:        idx,
+          position:  Cesium.Cartesian3.fromDegrees(pt.lon, pt.lat),
+          color:     ptColor(pt, idx),
+          pixelSize: ptSize(pt, idx),
+          show:      true,
         });
       }
-      
-      index = end;
-      
-      // Update progress
-      const progress = (index / points.length) * 100;
-      updateLoadingProgress(progress);
-      
-      // Continue or finish
-      if (index < points.length) {
-        requestAnimationFrame(processChunk);
-      } else {
-        resolve();
-      }
+      document.getElementById('loading-bar').style.width = (i/points.length*100)+'%';
+      document.getElementById('loading-text').textContent =
+        `Rendering ${i.toLocaleString()} / ${points.length.toLocaleString()}`;
+      if (i < points.length) requestAnimationFrame(chunk);
+      else resolve();
     }
-    
-    processChunk();
+    chunk();
   });
 }
 
-/**
- * Update the loading progress bar.
- */
-function updateLoadingProgress(percent) {
-  const bar = document.getElementById('loading-bar');
-  const text = document.getElementById('loading-text');
-  bar.style.width = percent + '%';
-  text.textContent = `Loading points: ${Math.round(percent)}%`;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   7. MAIN FILE LOADING FUNCTION
-   ═══════════════════════════════════════════════════════════════════════ */
-
-/**
- * Load all pending CSV files, parse them, and add points to the scene.
- */
+/* ═══════════════════════════════════════════════════
+   10. MAIN LOAD
+═══════════════════════════════════════════════════ */
 async function loadFiles() {
-  if (pendingFiles.length === 0) return;
-  
-  // Show loading UI
+  if (!pendingFiles.length) return;
   document.getElementById('load-btn').style.display = 'none';
-  document.getElementById('loading-bar-wrap').style.display = 'block';
-  document.getElementById('loading-text').style.display = 'block';
-  
+  const wrap = document.getElementById('loading-wrap');
+  wrap.style.display = 'flex';
+
   try {
-    // Initialize point collection if needed
     if (!pointCollection) {
       pointCollection = scene.primitives.add(new Cesium.PointPrimitiveCollection());
     }
-    
-    // Parse all files
-    for (let i = 0; i < pendingFiles.length; i++) {
-      const file = pendingFiles[i];
-      
-      // Skip if already loaded
+
+    for (const file of pendingFiles) {
       if (loadedFiles.has(file.name)) continue;
-      
-      updateLoadingProgress((i / pendingFiles.length) * 50); // First 50% for parsing
-      document.getElementById('loading-text').textContent = `Parsing ${file.name}...`;
-      
-      const { points, phase } = await parseCSVFile(file);
-      
-      // Set current phase (first file determines the mode)
-      if (!currentPhase) {
-        currentPhase = phase;
-        console.log(`Detected Phase: ${phase}`);
+      document.getElementById('loading-text').textContent = `Parsing ${file.name}…`;
+      document.getElementById('loading-sub').textContent  = '';
+      const t0 = performance.now();
+      const { points, fileType } = await parseCSVFile(file);
+      const ms = (performance.now()-t0).toFixed(0);
+
+      // First file that is NOT a reference sets the mode
+      if (!currentPhase && fileType !== 'reference') {
+        currentPhase = fileType;
+        if (fileType === 'phase4') document.getElementById('p4-panel').classList.add('active');
       }
-      
-      // Add points in chunks
-      document.getElementById('loading-text').textContent = `Adding ${points.length.toLocaleString()} points from ${file.name}...`;
-      await addPointsInChunks(points, 5000);
-      
+
+      document.getElementById('loading-sub').textContent =
+        `${points.length.toLocaleString()} ${fileType} points parsed in ${ms}ms`;
+      await addPointsInChunks(points);
       loadedFiles.add(file.name);
     }
-    
-    // Update stats
+
     updateStats();
-    
-    // Fly to data extent
     flyToData();
-    
-    // Hide modal, show app
+
+    if (currentPhase === 'phase4') { paintSlider(95); applyThreshold(); drawHistogram(); }
+
     document.getElementById('upload-modal').classList.add('hidden');
     document.getElementById('app').classList.add('visible');
-    
-    // Clear pending files
     pendingFiles = [];
-    
-  } catch (error) {
-    console.error('Error loading files:', error);
-    alert('Error loading CSV files. Check console for details.');
+    toast(`✓ ${allPoints.length.toLocaleString()} traces loaded`);
+
+  } catch (err) {
+    console.error(err);
+    toast('Error loading CSV — see console');
   }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   8. STATISTICS UPDATES
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   11. STATS
+═══════════════════════════════════════════════════ */
+function setEl(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
 
-/**
- * Update all sidebar statistics.
- */
 function updateStats() {
-  // Total traces
-  document.getElementById('s-total').textContent = allPoints.length.toLocaleString();
-  
-  // Files loaded
-  document.getElementById('s-files').textContent = loadedFiles.size;
-  
-  // Phase 4 predictions
-  const predMelt = allPoints.filter(p => p.consensus === 1).length;
-  const predIce = allPoints.filter(p => p.consensus === 0).length;
-  const totalPred = predMelt + predIce;
-  const meltPct = totalPred > 0 ? (predMelt / totalPred * 100).toFixed(2) : '0.00';
-  
-  document.getElementById('s-pred-melt').textContent = predMelt.toLocaleString();
-  document.getElementById('s-pred-ice').textContent = predIce.toLocaleString();
-  document.getElementById('s-pred-pct').textContent = meltPct + '%';
-  
-  // Phase 1 manual labels
-  const oceanLabels = allPoints.filter(p => p.label === 1).length;
-  const iceLabels = allPoints.filter(p => p.label === 0).length;
-  
-  document.getElementById('s-ocean').textContent = oceanLabels.toLocaleString();
-  document.getElementById('s-ice').textContent = iceLabels.toLocaleString();
-  
-  // Update export button
-  const totalLabels = oceanLabels + iceLabels;
-  const exportBtn = document.getElementById('export-btn');
-  if (totalLabels > 0) {
-    exportBtn.textContent = `📥 Export ${totalLabels.toLocaleString()} Labels`;
-    exportBtn.classList.remove('disabled');
-  } else {
-    exportBtn.textContent = 'No Labels to Export';
-    exportBtn.classList.add('disabled');
-  }
+  const total = allPoints.length;
+  setEl('s-total', total.toLocaleString());
+  setEl('s-files', loadedFiles.size);
+  setEl('h-total', total.toLocaleString());
+
+  const pM = allPoints.filter(p=>p.consensus===1).length;
+  const pI = allPoints.filter(p=>p.consensus===0).length;
+  const pT = pM+pI;
+  setEl('s-pred-melt', pM.toLocaleString());
+  setEl('s-pred-ice',  pI.toLocaleString());
+  setEl('s-pred-pct', pT>0 ? (pM/pT*100).toFixed(2)+'%' : '0.00%');
+  setEl('h-melt', pM.toLocaleString());
+  setEl('h-pct',  pT>0 ? (pM/pT*100).toFixed(2)+'%' : '—');
+
+  const oL = allPoints.filter(p=>p.label===1).length;
+  const iL = allPoints.filter(p=>p.label===0).length;
+  setEl('s-ocean', oL.toLocaleString());
+  setEl('s-ice',   iL.toLocaleString());
+
+  const expBtn = document.getElementById('export-btn');
+  const nL = oL+iL;
+  expBtn.textContent = nL>0 ? `Export ${nL.toLocaleString()} Labels` : 'No Labels to Export';
+  expBtn.classList.toggle('disabled', nL===0);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   9. CAMERA CONTROLS
-   ═══════════════════════════════════════════════════════════════════════ */
-
-/**
- * Fly camera to Antarctica.
- */
+/* ═══════════════════════════════════════════════════
+   12. CAMERA + COORDINATE FLY-TO WITH MARKER
+═══════════════════════════════════════════════════ */
 function flyToAntarctica() {
-  camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(0, -90, 15000000),
-    duration: 2.0
-  });
+  camera.flyTo({ destination:Cesium.Cartesian3.fromDegrees(0,-90,15000000), duration:2 });
 }
 
-/**
- * Fly camera to the extent of loaded data.
- */
 function flyToData() {
-  if (allPoints.length === 0) return;
-  
-  // Calculate bounding box
-  let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
-  allPoints.forEach(pt => {
-    if (pt.lat < minLat) minLat = pt.lat;
-    if (pt.lat > maxLat) maxLat = pt.lat;
-    if (pt.lon < minLon) minLon = pt.lon;
-    if (pt.lon > maxLon) maxLon = pt.lon;
+  const pts = allPoints.filter(p => !p.isRef);
+  if (!pts.length) return;
+  let minLat=90,maxLat=-90,minLon=180,maxLon=-180;
+  pts.forEach(p=>{
+    if(p.lat<minLat)minLat=p.lat; if(p.lat>maxLat)maxLat=p.lat;
+    if(p.lon<minLon)minLon=p.lon; if(p.lon>maxLon)maxLon=p.lon;
   });
-  
-  // Fly to center
-  const centerLat = (minLat + maxLat) / 2;
-  const centerLon = (minLon + maxLon) / 2;
-  const range = Math.max(maxLat - minLat, maxLon - minLon) * 111000 * 1.5; // Convert to meters
-  
-  camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, range),
-    duration: 2.0
-  });
+  const cx=(minLon+maxLon)/2, cy=(minLat+maxLat)/2;
+  const r=Math.max(maxLat-minLat,maxLon-minLon)*111000*1.8;
+  camera.flyTo({ destination:Cesium.Cartesian3.fromDegrees(cx,cy,r), duration:2 });
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   10. POLYGON DRAWING SYSTEM
-   ═══════════════════════════════════════════════════════════════════════ */
+function flyToCoords() {
+  const lat = parseFloat(document.getElementById('coord-lat').value);
+  const lon = parseFloat(document.getElementById('coord-lon').value);
+  if (isNaN(lat)||isNaN(lon)) { toast('Enter valid lat and lon values'); return; }
+  if (lat < -90||lat > 90)   { toast('Latitude must be between -90 and 90'); return; }
+  if (lon < -180||lon > 180) { toast('Longitude must be between -180 and 180'); return; }
 
+  // Remove old marker
+  if (coordMarkerEnt) { viewer.entities.remove(coordMarkerEnt); coordMarkerEnt = null; }
+
+  // Add a bright pulsing marker at the target location
+  coordMarkerEnt = viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(lon, lat),
+    point: {
+      pixelSize:        16,
+      color:            Cesium.Color.fromCssColorString('#00ffcc'),
+      outlineColor:     Cesium.Color.WHITE,
+      outlineWidth:     2,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    },
+    label: {
+      text:             `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`,
+      font:             '11px JetBrains Mono',
+      fillColor:        Cesium.Color.WHITE,
+      outlineColor:     Cesium.Color.BLACK,
+      outlineWidth:     2,
+      style:            Cesium.LabelStyle.FILL_AND_OUTLINE,
+      pixelOffset:      new Cesium.Cartesian2(0, -26),
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      showBackground:   true,
+      backgroundColor:  Cesium.Color.fromCssColorString('#001a12').withAlpha(0.88),
+      backgroundPadding: new Cesium.Cartesian2(7, 4),
+    }
+  });
+
+  camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(lon, lat, 600000),
+    duration: 2
+  });
+
+  toast(`📍 Flying to ${lat.toFixed(4)}°, ${lon.toFixed(4)}°`);
+
+  // Auto-remove marker after 8 seconds
+  setTimeout(() => {
+    if (coordMarkerEnt) { viewer.entities.remove(coordMarkerEnt); coordMarkerEnt = null; }
+  }, 8000);
+}
+
+// Allow Enter key in coord fields
+document.getElementById('coord-lat').addEventListener('keydown', e => { if(e.key==='Enter') flyToCoords(); });
+document.getElementById('coord-lon').addEventListener('keydown', e => { if(e.key==='Enter') flyToCoords(); });
+
+/* ═══════════════════════════════════════════════════
+   13. SIDEBAR
+═══════════════════════════════════════════════════ */
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
+
+/* ═══════════════════════════════════════════════════
+   14. POLYGON DRAWING
+   ─────────────────────────────────────────────────
+   BUG FIX: The previous version used only
+   viewer.camera.pickEllipsoid(). When drawn on top
+   of a terrain-enabled globe, pickEllipsoid() can
+   return undefined because the ray hits the terrain
+   mesh before the ellipsoid. We now use a two-step
+   approach:
+     1. scene.pickPosition()  — hits terrain surface
+     2. viewer.camera.pickEllipsoid() — fallback for
+        areas where terrain isn't loaded yet.
+   This makes drawing work reliably everywhere.
+═══════════════════════════════════════════════════ */
 const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
 
-/**
- * Toggle polygon drawing mode.
- */
 function toggleDraw() {
   drawMode = !drawMode;
   const btn = document.getElementById('dtool-draw');
-  
   if (drawMode) {
     btn.classList.add('active');
     scene.canvas.style.cursor = 'crosshair';
+    toast('Draw mode ON · Left-click to place vertices · Right-click to close', 3000);
   } else {
     btn.classList.remove('active');
     scene.canvas.style.cursor = 'default';
   }
 }
 
-/**
- * Handle mouse clicks for polygon drawing.
- */
+function getWorldPosition(screenPos) {
+  /* Try scene.pickPosition first (works on terrain) */
+  let cart = null;
+  if (scene.pickPositionSupported) {
+    cart = scene.pickPosition(screenPos);
+  }
+  /* Fallback: pick on ellipsoid */
+  if (!Cesium.defined(cart) || isNaN(cart.x)) {
+    cart = viewer.camera.pickEllipsoid(screenPos, scene.globe.ellipsoid);
+  }
+  return cart;
+}
+
 handler.setInputAction(function(click) {
   if (!drawMode) return;
-  
-  // Get clicked position on globe
-  const cartesian = viewer.camera.pickEllipsoid(click.position, scene.globe.ellipsoid);
-  if (!cartesian) return;
-  
-  vertices.push(cartesian);
-  
-  // Add vertex marker
-  const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
-  const entity = viewer.entities.add({
-    position: cartesian,
+
+  /* CRITICAL: In draw mode we don't want the tooltip LEFT_CLICK handler
+     (registered later) to fire. Since we registered this handler first,
+     it takes priority on LEFT_CLICK. */
+  const cart = getWorldPosition(click.position);
+  if (!Cesium.defined(cart)) return;
+
+  vertices.push(cart);
+  vertexEntities.push(viewer.entities.add({
+    position: cart,
     point: {
-      pixelSize: 8,
-      color: Cesium.Color.fromCssColorString('#ffd93d'),
+      pixelSize: 9,
+      color:     C.SELECTED,
       outlineColor: Cesium.Color.WHITE,
-      outlineWidth: 2
+      outlineWidth: 1.5,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
     }
-  });
-  vertexEntities.push(entity);
-  
-  // Update polyline
-  updatePolyline();
-  
+  }));
+  setEl('vtx-badge', `${vertices.length} vert.`);
+  refreshPolyline();
 }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-/**
- * Handle right-click to close polygon.
- */
 handler.setInputAction(function(click) {
   if (!drawMode || vertices.length < 3) return;
-  
   closePolygon();
-  
 }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
 
-/**
- * Update the polyline visualization during drawing.
- */
-function updatePolyline() {
-  if (polylineEnt) {
-    viewer.entities.remove(polylineEnt);
-  }
-  
+function refreshPolyline() {
+  if (polylineEnt) viewer.entities.remove(polylineEnt);
   if (vertices.length < 2) return;
-  
   polylineEnt = viewer.entities.add({
     polyline: {
       positions: vertices,
-      width: 3,
-      material: Cesium.Color.fromCssColorString('#ffd93d').withAlpha(0.8)
+      width: 2.5,
+      material: Cesium.Color.fromCssColorString('#d4900f').withAlpha(0.9),
+      clampToGround: false,
+      depthFailMaterial: Cesium.Color.fromCssColorString('#d4900f').withAlpha(0.5),
     }
   });
 }
 
-/**
- * Close the polygon and select points inside.
- */
 function closePolygon() {
-  if (vertices.length < 3) return;
-  
-  // Remove polyline, add filled polygon
-  if (polylineEnt) {
-    viewer.entities.remove(polylineEnt);
-    polylineEnt = null;
-  }
-  
+  if (polylineEnt) { viewer.entities.remove(polylineEnt); polylineEnt = null; }
+
   polygonEnt = viewer.entities.add({
     polygon: {
-      hierarchy: new Cesium.PolygonHierarchy(vertices),
-      material: Cesium.Color.fromCssColorString('#ffd93d').withAlpha(0.2),
-      outline: true,
-      outlineColor: Cesium.Color.fromCssColorString('#ffd93d'),
-      outlineWidth: 2
+      hierarchy:    new Cesium.PolygonHierarchy(vertices),
+      material:     Cesium.Color.fromCssColorString('#d4900f').withAlpha(0.12),
+      outline:      true,
+      outlineColor: Cesium.Color.fromCssColorString('#d4900f').withAlpha(0.9),
+      outlineWidth: 2,
+      perPositionHeight: true,
     }
   });
-  
-  // Convert vertices to lat/lon for Turf.js
-  const polygonCoords = vertices.map(v => {
-    const carto = Cesium.Cartographic.fromCartesian(v);
-    return [Cesium.Math.toDegrees(carto.longitude), Cesium.Math.toDegrees(carto.latitude)];
+
+  /* Convert vertices to geodetic for Turf.js point-in-polygon check */
+  const coords = vertices.map(v => {
+    const c = Cesium.Cartographic.fromCartesian(v);
+    return [Cesium.Math.toDegrees(c.longitude), Cesium.Math.toDegrees(c.latitude)];
   });
-  polygonCoords.push(polygonCoords[0]); // Close the loop
-  
-  const turfPolygon = turf.polygon([polygonCoords]);
-  
-  // Use Turf.js to find points inside polygon
+  coords.push(coords[0]); // close ring
+
+  const poly = turf.polygon([coords]);
   selectedIndices = [];
-  allPoints.forEach((pt, idx) => {
-    const turfPoint = turf.point([pt.lon, pt.lat]);
-    if (turf.booleanPointInPolygon(turfPoint, turfPolygon)) {
-      selectedIndices.push(idx);
-    }
+  allPoints.forEach((pt, i) => {
+    if (pt.isRef) return; // don't select reference points
+    if (turf.booleanPointInPolygon(turf.point([pt.lon, pt.lat]), poly))
+      selectedIndices.push(i);
   });
-  
-  // Update point colors
+
   refreshPointColors();
-  
-  // Show label panel
-  document.getElementById('lp-count').textContent = `${selectedIndices.length.toLocaleString()} traces selected`;
+  setEl('lp-count', `${selectedIndices.length.toLocaleString()} traces selected`);
   document.getElementById('label-panel').classList.add('visible');
-  
-  // Exit draw mode
+
   drawMode = false;
   document.getElementById('dtool-draw').classList.remove('active');
   scene.canvas.style.cursor = 'default';
+  setEl('vtx-badge', '0 vertices');
 }
 
-/**
- * Undo the last vertex.
- */
 function undoVertex() {
-  if (vertices.length === 0) return;
-  
+  if (!vertices.length) return;
   vertices.pop();
-  const entity = vertexEntities.pop();
-  if (entity) viewer.entities.remove(entity);
-  
-  updatePolyline();
+  const e = vertexEntities.pop();
+  if (e) viewer.entities.remove(e);
+  setEl('vtx-badge', `${vertices.length} vert.`);
+  refreshPolyline();
 }
 
-/**
- * Clear the current drawing.
- */
 function clearDrawing() {
-  vertices = [];
-  vertexEntities.forEach(e => viewer.entities.remove(e));
-  vertexEntities = [];
-  
-  if (polylineEnt) {
-    viewer.entities.remove(polylineEnt);
-    polylineEnt = null;
-  }
-  
-  if (polygonEnt) {
-    viewer.entities.remove(polygonEnt);
-    polygonEnt = null;
-  }
-  
-  selectedIndices = [];
+  vertices=[]; vertexEntities.forEach(e=>viewer.entities.remove(e)); vertexEntities=[];
+  if (polylineEnt){ viewer.entities.remove(polylineEnt); polylineEnt=null; }
+  if (polygonEnt) { viewer.entities.remove(polygonEnt);  polygonEnt=null; }
+  selectedIndices=[];
   refreshPointColors();
-  
   document.getElementById('label-panel').classList.remove('visible');
+  setEl('vtx-badge', '0 vertices');
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   11. LABEL ASSIGNMENT
-   ═══════════════════════════════════════════════════════════════════════ */
-
-/**
- * Assign a label to all selected points.
- * @param {number|undefined} labelValue - 0 for Interior, 1 for Ocean, undefined to remove
- */
-function assignLabel(labelValue) {
-  selectedIndices.forEach(idx => {
-    allPoints[idx].label = labelValue;
-  });
-  
-  // Clear selection
-  clearDrawing();
-  
-  // Update stats
-  updateStats();
+/* ═══════════════════════════════════════════════════
+   15. LABEL ASSIGNMENT
+═══════════════════════════════════════════════════ */
+function assignLabel(v) {
+  selectedIndices.forEach(i => { allPoints[i].label = v; });
+  clearDrawing(); updateStats();
+  toast(v===1?'✓ Labelled as Ocean':v===0?'✓ Labelled as Interior':'✓ Label removed');
 }
-
-/**
- * Cancel the current selection without assigning labels.
- */
-function cancelSelection() {
-  clearDrawing();
-}
-
-/**
- * Clear all Phase 1 manual labels.
- */
+function cancelSelection() { clearDrawing(); }
 function clearAllLabels() {
-  if (!confirm('Are you sure you want to clear all Phase 1 labels?')) return;
-  
-  allPoints.forEach(pt => {
-    delete pt.label;
-  });
-  
-  refreshPointColors();
-  updateStats();
+  if (!confirm('Clear all Phase 1 manual labels?')) return;
+  allPoints.forEach(p => delete p.label);
+  refreshPointColors(); updateStats();
+  toast('Phase 1 labels cleared');
 }
-
-/* ═══════════════════════════════════════════════════════════════════════
-   12. POINT RENDERING
-   ═══════════════════════════════════════════════════════════════════════ */
-
-/**
- * Refresh all point colors and sizes.
- */
 function refreshPointColors() {
   if (!pointCollection) return;
-  
-  for (let i = 0; i < allPoints.length; i++) {
-    const primitive = pointCollection.get(i);
-    if (primitive) {
-      primitive.color = getPointColor(allPoints[i], i);
-      primitive.pixelSize = getPointSize(allPoints[i], i);
-    }
+  for (let i=0; i<allPoints.length; i++) {
+    const p = pointCollection.get(i);
+    if (p) { p.color=ptColor(allPoints[i],i); p.pixelSize=ptSize(allPoints[i],i); }
   }
+  scene.requestRender();
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   13. HOVER TOOLTIPS (PHASE 4)
-   ═══════════════════════════════════════════════════════════════════════ */
-
+/* ═══════════════════════════════════════════════════
+   16. TOOLTIP
+   ─────────────────────────────────────────────────
+   Correct Cesium pick pattern:
+     picked.primitive = the PointPrimitive (not the collection)
+     picked.id        = the integer index we stored
+   Check: Cesium.defined(picked) && picked.id !== undefined && picked.id !== null
+   idx=0 is valid so we must NOT use falsy check.
+═══════════════════════════════════════════════════ */
 const tooltip = document.getElementById('hover-tooltip');
-let hoveredPointIndex = null;
+const ttBar   = document.getElementById('tt-bar');
+const ttBody  = document.getElementById('tt-body');
 
-/**
- * Handle mouse move for hover tooltips.
- */
-handler.setInputAction(function(movement) {
-  // Only show tooltips in Phase 4 mode
-  if (currentPhase !== 'phase4') return;
-  
-  // Pick a point
-  const pickedObject = scene.pick(movement.endPosition);
-  
-  if (Cesium.defined(pickedObject) && pickedObject.primitive === pointCollection) {
-    const pointIndex = pickedObject.id;
-    
-    if (pointIndex !== undefined && pointIndex !== hoveredPointIndex) {
-      hoveredPointIndex = pointIndex;
-      const point = allPoints[pointIndex];
-      
-      if (point) {
-        showTooltip(point, movement.endPosition);
-      }
-    }
+const FEAT_RANGES = {
+  peak_power_db:[-80,-20], echo_energy_db:[-80,-20],
+  leading_edge_slope:[0,20], texture_variance:[0,1500],
+  local_contrast:[0,60], waveform_coherence:[0,1],
+  rsr_pc:[-80,-20], rsr_pn:[-80,-20], rsr_specularity:[-5,15],
+};
+function normFeat(key, val) {
+  if (val===undefined) return 0;
+  const [lo,hi] = FEAT_RANGES[key]||[0,1];
+  return Math.max(0, Math.min(1, (val-lo)/(hi-lo)));
+}
+function barHTML(key, val) {
+  const pct = Math.round(normFeat(key,val)*100);
+  const col = pct>66?'#e53e3e':pct>33?'#e8a020':'#5090b8';
+  return `<div class="tt-fbar-wrap"><div class="tt-fbar">
+    <div class="tt-fbar-fill" style="width:${pct}%;background:${col}"></div>
+  </div></div>`;
+}
+function fv(v,d=3) {
+  if(v===undefined||v===null||(typeof v==='number'&&isNaN(v)))return'—';
+  return Number(v).toFixed(d);
+}
+
+function renderTooltip(pt) {
+  // Reference point tooltip
+  if (pt.isRef) {
+    const col = pt.refType==='ocean' ? '#ff00ff' : '#00e5ff';
+    ttBar.style.background = col;
+    ttBody.innerHTML = `
+      <div class="tt-file">${pt.name||'Reference'}</div>
+      <div class="tt-meta">${pt.refType==='ocean'?'Subglacial Lake':'Interior Ice Reference'}</div>
+      <div class="tt-prob-block">
+        <span class="tt-prob-lbl">Reference Type</span>
+        <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:${col}">
+          ${pt.refType==='ocean'?'LAKE':'ICE'}
+        </span>
+      </div>
+      <div class="tt-div">Location</div>
+      <div class="tt-loc">
+        <div class="tt-loc-cell"><span class="tt-loc-lbl">Latitude</span><span class="tt-loc-val">${pt.lat.toFixed(4)}°</span></div>
+        <div class="tt-loc-cell"><span class="tt-loc-lbl">Longitude</span><span class="tt-loc-val">${pt.lon.toFixed(4)}°</span></div>
+      </div>
+      <div class="tt-div">Note</div>
+      <div style="font-size:9px;color:var(--tx2);line-height:1.5">${pt.desc||''}</div>
+    `;
+    return;
+  }
+
+  const prob   = typeof pt.melt_prob==='number' ? pt.melt_prob : null;
+  const pPct   = prob!==null ? (prob*100).toFixed(1) : null;
+  const high   = prob!==null && prob>0.90;
+  const mid    = prob!==null && prob>0.5 && prob<=0.90;
+  const fillW  = prob!==null ? Math.round(prob*100) : 0;
+  const col    = high?'red':mid?'amber':'blue';
+  const barGrd = high ? `linear-gradient(to right,#9b2c2c,#e53e3e ${fillW}%,#111 ${fillW}%)`
+               : mid  ? `linear-gradient(to right,#b07010,#e8a020 ${fillW}%,#111 ${fillW}%)`
+               :        `linear-gradient(to right,#2a5276,#5090b8 ${fillW}%,#111 ${fillW}%)`;
+  ttBar.style.background = barGrd;
+
+  const fname = (pt.filename||'unknown').split('/').pop().split('\\').pop();
+  ttBody.innerHTML = `
+    <div class="tt-file" title="${pt.filename||''}">${fname}</div>
+    <div class="tt-meta">Trace #${pt.trace_idx??'—'} &nbsp;·&nbsp; ${pt.segment||'—'}</div>
+    ${prob!==null?`
+    <div class="tt-prob-block">
+      <span class="tt-prob-lbl">Melt Probability</span>
+      <span class="tt-prob-val ${col}">${pPct}%</span>
+    </div>`:''}
+    <div class="tt-div">Location</div>
+    <div class="tt-loc">
+      <div class="tt-loc-cell"><span class="tt-loc-lbl">Latitude</span><span class="tt-loc-val">${pt.lat.toFixed(6)}°</span></div>
+      <div class="tt-loc-cell"><span class="tt-loc-lbl">Longitude</span><span class="tt-loc-val">${pt.lon.toFixed(6)}°</span></div>
+    </div>
+    ${pt.peak_power_db!==undefined?`
+    <div class="tt-div">9-Feature Radar Physics Vector</div>
+    <div class="tt-feats">
+      <span class="tt-fk">peak_power_db</span><span class="tt-fv">${fv(pt.peak_power_db,2)} dB</span>${barHTML('peak_power_db',pt.peak_power_db)}
+      <span class="tt-fk">echo_energy_db</span><span class="tt-fv">${fv(pt.echo_energy_db,2)} dB</span>${barHTML('echo_energy_db',pt.echo_energy_db)}
+      <span class="tt-fk">leading_edge_slope</span><span class="tt-fv">${fv(pt.leading_edge_slope,4)}</span>${barHTML('leading_edge_slope',pt.leading_edge_slope)}
+      <span class="tt-fk">texture_variance</span><span class="tt-fv">${fv(pt.texture_variance,1)}</span>${barHTML('texture_variance',pt.texture_variance)}
+      <span class="tt-fk">local_contrast</span><span class="tt-fv">${fv(pt.local_contrast,2)}</span>${barHTML('local_contrast',pt.local_contrast)}
+      <span class="tt-fk">waveform_coherence</span><span class="tt-fv">${fv(pt.waveform_coherence,4)}</span>${barHTML('waveform_coherence',pt.waveform_coherence)}
+      <span class="tt-fk ice">rsr_pc</span><span class="tt-fv ice">${fv(pt.rsr_pc,2)} dB</span>${barHTML('rsr_pc',pt.rsr_pc)}
+      <span class="tt-fk ice">rsr_pn</span><span class="tt-fv ice">${fv(pt.rsr_pn,2)} dB</span>${barHTML('rsr_pn',pt.rsr_pn)}
+      <span class="tt-fk ice">rsr_specularity</span><span class="tt-fv ice">${fv(pt.rsr_specularity,4)}</span>${barHTML('rsr_specularity',pt.rsr_specularity)}
+    </div>`:''}
+  `;
+}
+
+function placeTooltip(pos) {
+  const W=300, H=490, vw=window.innerWidth, vh=window.innerHeight;
+  let x=pos.x+18, y=pos.y+14;
+  if (x+W>vw-6) x=pos.x-W-14;
+  if (y+H>vh-6) y=pos.y-H-14;
+  tooltip.style.left = Math.max(0,x)+'px';
+  tooltip.style.top  = Math.max(0,y)+'px';
+}
+
+/* MOUSE_MOVE — registered AFTER the drawing LEFT_CLICK handler */
+handler.setInputAction(function(mov) {
+  /* Show tooltip for both phase4 and reference points */
+  if (currentPhase !== 'phase4' && !allPoints.some(p=>p.isRef)) {
+    tooltip.classList.remove('visible'); return;
+  }
+  const picked = scene.pick(mov.endPosition);
+  if (Cesium.defined(picked) && picked.id !== undefined && picked.id !== null) {
+    const idx = picked.id;
+    const pt  = allPoints[idx];
+    if (!pt) { tooltip.classList.remove('visible'); lastHoverIdx=-1; return; }
+    if (idx !== lastHoverIdx) { renderTooltip(pt); lastHoverIdx=idx; }
+    placeTooltip(mov.endPosition);
+    tooltip.classList.add('visible');
   } else {
-    hideTooltip();
-    hoveredPointIndex = null;
+    tooltip.classList.remove('visible'); lastHoverIdx=-1;
   }
 }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
-/**
- * Display the hover tooltip.
- */
-function showTooltip(point, screenPosition) {
-  const meltProb = point.melt_prob !== undefined ? (point.melt_prob * 100).toFixed(1) + '%' : 'N/A';
-  const consensus = point.consensus === 1 ? 'Meltwater' : point.consensus === 0 ? 'Ice' : 'Unknown';
-  const consensusClass = point.consensus === 1 ? 'melt' : 'ice';
-  
-  let html = `
-    <div class="tooltip-row">
-      <span class="tooltip-key">File:</span>
-      <span class="tooltip-value">${point.filename}</span>
-    </div>
-    <div class="tooltip-row">
-      <span class="tooltip-key">Trace Index:</span>
-      <span class="tooltip-value">${point.trace_idx}</span>
-    </div>
-    <div class="tooltip-divider"></div>
-    <div class="tooltip-row">
-      <span class="tooltip-key">Latitude:</span>
-      <span class="tooltip-value">${point.lat.toFixed(6)}°</span>
-    </div>
-    <div class="tooltip-row">
-      <span class="tooltip-key">Longitude:</span>
-      <span class="tooltip-value">${point.lon.toFixed(6)}°</span>
-    </div>
-    <div class="tooltip-divider"></div>
-    <div class="tooltip-row">
-      <span class="tooltip-key">Melt Probability:</span>
-      <span class="tooltip-value">${meltProb}</span>
-    </div>
-  `;
-  
-  // Add physics features if available
-  if (point.peak_power_db !== undefined) {
-    html += `
-      <div class="tooltip-row">
-        <span class="tooltip-key">Peak Power:</span>
-        <span class="tooltip-value">${point.peak_power_db.toFixed(1)} dB</span>
-      </div>
-    `;
-  }
-  
-  if (point.echo_width_fwhm !== undefined) {
-    html += `
-      <div class="tooltip-row">
-        <span class="tooltip-key">Echo Width:</span>
-        <span class="tooltip-value">${point.echo_width_fwhm.toFixed(3)} ns</span>
-      </div>
-    `;
-  }
-  
-  if (point.rsr_specularity !== undefined) {
-    html += `
-      <div class="tooltip-row">
-        <span class="tooltip-key">RSR Specularity:</span>
-        <span class="tooltip-value">${point.rsr_specularity.toFixed(3)}</span>
-      </div>
-    `;
-  }
-  
-  html += `
-    <div class="tooltip-consensus ${consensusClass}">
-      ${consensus === 'Meltwater' ? '🔴' : '🔵'} ${consensus}
-    </div>
-  `;
-  
-  tooltip.innerHTML = html;
-  tooltip.style.left = (screenPosition.x + 15) + 'px';
-  tooltip.style.top = (screenPosition.y + 15) + 'px';
-  tooltip.classList.add('visible');
-}
-
-/**
- * Hide the hover tooltip.
- */
-function hideTooltip() {
-  tooltip.classList.remove('visible');
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   14. EXPORT SELECTION.JSON
-   ═══════════════════════════════════════════════════════════════════════ */
-
-/**
- * Export Phase 1 labels as selection.json.
- */
+/* ═══════════════════════════════════════════════════
+   17. EXPORT selection.json
+═══════════════════════════════════════════════════ */
 function exportSelection() {
-  const labeledPoints = allPoints.filter(p => p.label !== undefined);
-  
-  if (labeledPoints.length === 0) {
-    alert('No labels to export. Please assign labels first.');
-    return;
-  }
-  
-  // Count labels
-  const oceanCount = labeledPoints.filter(p => p.label === 1).length;
-  const iceCount = labeledPoints.filter(p => p.label === 0).length;
-  
-  // Build JSON structure
-  const exportData = {
+  const labeled = allPoints.filter(p=>p.label!==undefined&&!p.isRef);
+  if (!labeled.length) { toast('No labels to export'); return; }
+  const data = {
     metadata: {
       exported_at: new Date().toISOString(),
-      total_labelled: labeledPoints.length,
-      ocean_count: oceanCount,
-      ice_count: iceCount,
-      description: "Phase 1 Metadata Labels mapped for Kaggle Targeted Extraction."
+      total_labelled: labeled.length,
+      ocean_count: labeled.filter(p=>p.label===1).length,
+      ice_count:   labeled.filter(p=>p.label===0).length,
+      description: 'Phase 1 Metadata Labels — MeltWatch Antarctic Research Platform v5.1'
     },
-    labels: labeledPoints.map(p => ({
-      label: p.label,
-      filename: p.filename,
-      trace_idx: p.trace_idx
-    }))
+    labels: labeled.map(p=>({ label:p.label, filename:p.filename, trace_idx:p.trace_idx }))
   };
-  
-  // Create download
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'selection.json';
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),
+    download: 'selection.json'
+  });
   a.click();
-  URL.revokeObjectURL(url);
-  
-  console.log('Exported selection.json:', exportData);
+  toast(`✓ Exported ${labeled.length.toLocaleString()} labels`);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   15. INITIALIZATION
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   18. KEYBOARD SHORTCUTS
+═══════════════════════════════════════════════════ */
+function toggleKeys() {
+  document.getElementById('keys-overlay').classList.toggle('visible');
+}
 
-// Start with upload modal visible
-document.getElementById('upload-modal').classList.remove('hidden');
+document.addEventListener('keydown', e => {
+  if (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  switch(e.key.toLowerCase()) {
+    case 'd':   toggleDraw(); break;
+    case 'z':   undoVertex(); break;
+    case 'escape':
+      clearDrawing();
+      document.getElementById('keys-overlay').classList.remove('visible');
+      break;
+    case 'a':   flyToAntarctica(); toast('Flying to South Pole'); break;
+    case 'f':   flyToData();       toast('Flying to data extent'); break;
+    case 's':   toggleSidebar();   break;
+    case 'o':   openUploadModal(); break;
+    case '?':   toggleKeys();      break;
+  }
+});
 
-console.log('Antarctic Meltwater 3D Dashboard initialized.');
-console.log('Ready to load Phase 1 metadata or Phase 4 prediction CSVs.');
+/* ═══════════════════════════════════════════════════
+   19. BOOT
+═══════════════════════════════════════════════════ */
+paintSlider(95);
+window.addEventListener('resize', () => { if(currentPhase==='phase4') drawHistogram(); });
 
+console.log('%c MeltWatch v5.1 · Antarctic Meltwater Research Platform',
+  'font-weight:700;font-size:13px;color:#e53e3e');
+console.log('%c Fixed: polygon drawing | white text | coord marker | reference CSV support',
+  'color:#666;font-size:11px');
 </script>
-
 </body>
 </html>
